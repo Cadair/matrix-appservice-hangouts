@@ -1,0 +1,7 @@
+- hosts: all
+  user: deploy
+  become: True
+  gather_facts: True
+
+  roles:
+    - synapse

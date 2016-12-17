@@ -1,0 +1,20 @@
+- name: Install Matrix Repo
+  apt_repository:
+    repo: deb http://matrix.org/packages/debian/ jessie main
+    state: present
+
+- name: Add repo key
+  apt_key:
+    url: http://matrix.org/packages/debian/repo-key.asc
+
+- name: Update repositories cache and install "synapse" package
+  apt:
+    name: matrix-synapse
+    update_cache: yes
+
+- name: Install the web client
+  apt:
+    name: matrix-synapse-angular-client
+
+- name: Configure Synapse
+  command: python -m synapse.app.homeserver --server-name localhost --config-path homeserver.yaml --report-stats=no --generate-config chdir=/etc/synapse
