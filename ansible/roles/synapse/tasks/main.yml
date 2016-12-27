@@ -16,5 +16,17 @@
   apt:
     name: matrix-synapse-angular-client
 
+- name: Make Synapse config folder
+  file: path=/etc/synapse state=directory
+
 - name: Configure Synapse
-  command: python -m synapse.app.homeserver --server-name localhost --config-path homeserver.yaml --report-stats=no --generate-config chdir=/etc/synapse
+  command: python -m synapse.app.homeserver --server-name localhost --config-path homeserver.yaml --generate-config --report-stats=no chdir=/etc/synapse creates=/etc/synapse/homeserver.db
+
+- name: Copy homeserver.yaml
+  template: src=templates/homeserver.yaml dest=/etc/synapse/homeserver.yaml
+
+- name: Start Synapse
+  command: sudo synctl start /etc/synapse/homeserver.yaml
+
+- name: Add an admin user to Synapse
+  command: register_new_matrix_user -c /etc/synapse/homeserver.yaml -u admin -p admin -a
