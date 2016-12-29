@@ -1,84 +1,85 @@
-from time import time
 import json
+import os.path
+from time import time
+from urllib.parse import urljoin, quote
 
 import requests
-from flask import jsonify
+import aiohttp
 
-from urllib.parse import urljoin, quote
-import os.path
+
 
 BASE_URL = "http://localhost:8008"
 API_ENDPOINT = "_matrix/client/api/v1/"
 
 
-def get_url(endpoint, api_endpoint):
-    end = urljoin(api_endpoint, endpoint)
-    target = urljoin(BASE_URL, end)
-    return target
-
-
-def post(endpoint, content, api_endpoint=None):
+class MatrixClient:
     """
-    Send a post request to endpoint with content.
+    A client to talk to a matrix server.
     """
-    if not api_endpoint:
-        api_endpoint = API_ENDPOINT
-    target = get_url(endpoint, api_endpoint)
+    def __init__(self, base_url, access_token, client_session=None):
+        self.access_token = access_token
+        self.base_url = base_url
 
-    print(f"post {content} to {target}")
+        #if not client_session:
+        #    self.session = aiohttp.ClientSession()
+        #else:
+        #    self.session = client_session
 
-    headers = {"Content-Type":"application/json"}
-
-    resp = requests.post(target, json.dumps(content), headers=headers)
-    print(resp, resp.content)
-
-
-def get(endpoint, params=None, api_endpoint=None):
-    if not api_endpoint:
-        api_endpoint = API_ENDPOINT
-    target = get_url(endpoint, api_endpoint)
-
-    resp = requests.get(target, params)
-    print(resp.content)
-    return resp.content
+        self.v1_endpoint = "_matrix/client/api/v1/"
+        self.room_endpoint = "_matrix/client/r0/"
 
 
-def put(endpoint, data, api_endpoint=None):
-    if not api_endpoint:
-        api_endpoint = API_ENDPOINT
-    target = get_url(endpoint, api_endpoint)
-
-    print(f"Putting {data} to {target}")
-    resp = requests.put(target, json.dumps(data))
-    print(resp, resp.content)
+    def _get_url(self, endpoint, api_endpoint):
+        end = urljoin(api_endpoint, endpoint)
+        target = urljoin(BASE_URL, end)
+        return target
 
 
+    def _post(self, endpoint, content, api_endpoint):
+        """
+        Send a post request to endpoint with content.
+        """
+        target = self._get_url(endpoint, api_endpoint)
+        headers = {"Content-Type":"application/json"}
 
-def get_text_body(text, msgtype="m.text"):
-    return {
-        "msgtype": msgtype,
-        "body": text
-    }
+        print(endpoint, content, headers)
+        return requests.post(target, json.dumps(content), headers=headers)
 
+    def _get(self, endpoint, api_endpoint, params=None):
+        target = self._get_url(endpoint, api_endpoint)
 
-def send_message(room_id, message):
-    """
-    Send message
-    """
-    transaction = quote(str(int(time() * 1000)))
-    room_id = quote(room_id)
-    event_type = quote("m.room.message")
+        resp = requests.get(target, params)
+        return resp
 
-    path = f"rooms/{room_id}/send/{event_type}?access_token=wfghWEGh3wgWHEf3478sHFWE"
-    message = get_text_body(message)
-    print(f"Sending {message} to {path}")
+    def _put(self, endpoint, data, api_endpoint):
+        target = self._get_url(endpoint, api_endpoint)
+        resp = requests.put(target, json.dumps(data))
+        return resp
 
-    post(path, message, api_endpoint="_matrix/client/r0/")
+    def _get_text_body(self, text, msgtype="m.text"):
+        return {
+            "msgtype": msgtype,
+            "body": text
+        }
 
+    def send_message(self, room_id, message):
+        """
+        Send message
+        """
+        transaction = quote(str(int(time() * 1000)))
+        room_id = quote(room_id)
+        event_type = quote("m.room.message")
 
-def get_room_id(room_alias):
-    api_endpoint = "_matrix/client/r0/"
-    room_alias = quote(room_alias)
+        path = f"rooms/{room_id}/send/{event_type}?access_token={self.access_token}"
+        message = self._get_text_body(message)
+        print(f"Sending {message} to {path}")
 
-    get("directory/room/{room_alias}", api_endpoint=api_endpoint)
+        self._post(path, message, self.room_endpoint)
 
+    def get_room_id(self, room_alias):
+        room_alias = quote(room_alias)
+        return self._get("directory/room/{room_alias}", self.room_endpoint)
+
+    def join_room(self, room_alias):
+        room_alias = quote(room_alias)
+        self._post(f"join/{room_alias}?access_token={self.access_token}", {}, self.room_endpoint)
