@@ -16,14 +16,10 @@ class MatrixClient:
     """
     A client to talk to a matrix server.
     """
-    def __init__(self, base_url, access_token, client_session=None):
+    def __init__(self, base_url, access_token, client_session):
         self.access_token = access_token
         self.base_url = base_url
-
-        #if not client_session:
-        #    self.session = aiohttp.ClientSession()
-        #else:
-        #    self.session = client_session
+        self.session = client_session
 
         self.v1_endpoint = "_matrix/client/api/v1/"
         self.room_endpoint = "_matrix/client/r0/"
