@@ -30,6 +30,31 @@ class MatrixClient:
         target = urljoin(BASE_URL, end)
         return target
 
+    def _jsonify(self, adict):
+        return json.dumps(adict).encode()
+
+    async def _send(self, method, endpoint, *, api_path=None, **kwargs):
+        """
+        Send a HTTP Request
+
+        Parameters
+        ----------
+
+        method : `str`
+            The HTTP method.
+
+        endpoint : `str`
+            Endpoint
+
+        api_path : `str` (optional)
+            Endpoint, defaults to `MatrixClient.v1_endpoint`.
+        """
+        if not api_path:
+            api_path = self.v1_endpoint
+
+        url = self._get_url(endpoint, api_path)
+
+        return self.session.request(method, url, **kwargs)
 
     def _post(self, endpoint, content, api_endpoint):
         """
@@ -38,8 +63,8 @@ class MatrixClient:
         target = self._get_url(endpoint, api_endpoint)
         headers = {"Content-Type":"application/json"}
 
-        print(endpoint, content, headers)
-        return requests.post(target, json.dumps(content), headers=headers)
+        print(target, content, headers)
+        return requests.post(target, self._jsonify(content), headers=headers)
 
     def _get(self, endpoint, api_endpoint, params=None):
         target = self._get_url(endpoint, api_endpoint)
@@ -53,12 +78,11 @@ class MatrixClient:
         return resp
 
     def _get_text_body(self, text, msgtype="m.text"):
-        return {
-            "msgtype": msgtype,
-            "body": text
-        }
+        data = {"msgtype": msgtype,
+                "body": text}
+        return self._jsonify(data)
 
-    def send_message(self, room_id, message):
+    async def send_message(self, room_id, message):
         """
         Send message
         """
@@ -68,9 +92,10 @@ class MatrixClient:
 
         path = f"rooms/{room_id}/send/{event_type}?access_token={self.access_token}"
         message = self._get_text_body(message)
-        print(f"Sending {message} to {path}")
 
-        self._post(path, message, self.room_endpoint)
+        resp = await self._send("POST", path, api_path=self.room_endpoint, data=message)
+        async with resp as r:
+            return r
 
     def get_room_id(self, room_alias):
         room_alias = quote(room_alias)
@@ -79,3 +104,15 @@ class MatrixClient:
     def join_room(self, room_alias):
         room_alias = quote(room_alias)
         self._post(f"join/{room_alias}?access_token={self.access_token}", {}, self.room_endpoint)
+
+    def create_room(self, alias_name):
+        """
+        """
+        alias_localpart = alias_name.split(":")[0][1:]
+        endpoint = f"createRoom?access_token={self.access_token}"
+
+        content = json.dumps({"room_alias_name": alias_localpart})
+        print(type(content), content)
+
+        rep = self._post(endpoint, content, self.room_endpoint)
+        return rep
