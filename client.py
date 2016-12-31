@@ -56,27 +56,6 @@ class MatrixClient:
 
         return self.session.request(method, url, **kwargs)
 
-    def _post(self, endpoint, content, api_endpoint):
-        """
-        Send a post request to endpoint with content.
-        """
-        target = self._get_url(endpoint, api_endpoint)
-        headers = {"Content-Type":"application/json"}
-
-        print(target, content, headers)
-        return requests.post(target, self._jsonify(content), headers=headers)
-
-    def _get(self, endpoint, api_endpoint, params=None):
-        target = self._get_url(endpoint, api_endpoint)
-
-        resp = requests.get(target, params)
-        return resp
-
-    def _put(self, endpoint, data, api_endpoint):
-        target = self._get_url(endpoint, api_endpoint)
-        resp = requests.put(target, json.dumps(data))
-        return resp
-
     def _get_text_body(self, text, msgtype="m.text"):
         data = {"msgtype": msgtype,
                 "body": text}
@@ -97,22 +76,29 @@ class MatrixClient:
         async with resp as r:
             return r
 
-    def get_room_id(self, room_alias):
+    async def get_room_id(self, room_alias):
         room_alias = quote(room_alias)
-        return self._get("directory/room/{room_alias}", self.room_endpoint)
+        resp = self._send("GET", f"directory/room/{room_alias}", api_path=self.room_endpoint)
+        async with resp as r:
+            return r
 
-    def join_room(self, room_alias):
+    async def join_room(self, room_alias):
         room_alias = quote(room_alias)
-        self._post(f"join/{room_alias}?access_token={self.access_token}", {}, self.room_endpoint)
+        resp = await self._send("POST", f"join/{room_alias}?access_token={self.access_token}",
+                                api_path=self.room_endpoint)
+        async with resp as r:
+            return r
 
-    def create_room(self, alias_name):
+    async def create_room(self, alias_name):
         """
         """
         alias_localpart = alias_name.split(":")[0][1:]
         endpoint = f"createRoom?access_token={self.access_token}"
 
-        content = json.dumps({"room_alias_name": alias_localpart})
+        content = self._jsonify({"room_alias_name": alias_localpart})
         print(type(content), content)
 
-        rep = self._post(endpoint, content, self.room_endpoint)
-        return rep
+        resp = await self._send("POST", endpoint,
+                                api_path=self.room_endpoint, data=content)
+        with resp as r:
+            return r

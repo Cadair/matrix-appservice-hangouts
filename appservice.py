@@ -21,9 +21,9 @@ async def recieve_transaction(request, matrix_client=None):
         print("User: %s Room: %s" % (event["user_id"], event["room_id"]))
         print("Event Type: %s" % event["type"])
         print("Content: %s" % event["content"])
-    if "logging" not in event['user_id']:
-        resp = await client.send_message(event["room_id"], "Hello World")
-        print(resp)
+        if "logging" not in event['user_id'] and "m.room.message" in event["type"]:
+            resp = await client.send_message(event["room_id"], "Hello World")
+            print(resp)
 
     return web.Response(body=b"{}")
 
@@ -32,7 +32,7 @@ async def room_alias(request):
     alias = request.match_info["alias"]
     print(f"Recieved request {alias}")
 
-    rep = client.create_room(alias)
+    await rep = client.create_room(alias)
 
     return web.Response(body=b"{}")
 
