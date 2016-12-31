@@ -1,4 +1,5 @@
-# An ID which is unique across all application services on your homeserver. This should never be changed once set.
+# An ID which is unique across all application services on your homeserver. This
+# should never be changed once set.
 
 id: "hangouts-as"
 
@@ -13,11 +14,13 @@ as_token: wfghWEGh3wgWHEf3478sHFWE
 # This can be anything you want.
 hs_token: ugw8243igya57aaABGFfgeyu
 
-# this is the local part of the desired user ID for this AS (in this case @logging:localhost)
-sender_localpart: logging
+# this is the local part of the desired user ID for this AS
+sender_localpart: hangouts
 namespaces:
-  users: []
+  users:
+    - exclusive: true
+      regex: "#hangouts_.*"
   rooms: []
   aliases:
-    - exclusive: false
-      regex: "#logged_.*"
+    - exclusive: true
+      regex: "#hangouts_.*"
