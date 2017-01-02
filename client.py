@@ -55,6 +55,7 @@ class MatrixClient:
         url = self._get_url(endpoint, api_path)
 
         async with self.session.request(method, url, **kwargs) as resp:
+            await resp.read()
             return resp
 
     def _get_text_body(self, text, msgtype="m.text"):
@@ -101,6 +102,7 @@ class MatrixClient:
         resp = await self._send("POST", f"join/{room_alias}",
                                 api_path=self.room_endpoint,
                                 params=p)
+        print(resp, await resp.read())
         return resp
 
     async def create_room(self, alias_name):

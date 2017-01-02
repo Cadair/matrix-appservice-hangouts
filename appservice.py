@@ -43,7 +43,8 @@ class AppService:
             print("Content: %s" % event["content"])
             if "hangouts" not in event['user_id'] and "m.room.message" in event["type"]:
                 resp = await self.matrix_client.send_message(event["room_id"],
-                                                             "Hello {user_id}".format(user_id=event['user_id']))
+                                                             "Hello {user_id}".format(user_id=event['user_id']),
+                                                             user_id="@hangouts_test1:localhost")
 
         return web.Response(body=b"{}")
 
@@ -67,31 +68,11 @@ class AppService:
         """
         data = self.matrix_client._jsonify({'type': "m.login.application_service",
                                             'username':quote(localpart)})
-        print(data)
 
         resp = await self.matrix_client._send("POST", "register",
                                               api_path=self.matrix_client.room_endpoint,
                                               params=self.matrix_client._token_params(),
                                               data=data)
-        print(resp)
+        print(await resp.read())
         return resp
 
-
-
-if __name__ == "__main__":
-    access_token = "wfghWEGh3wgWHEf3478sHFWE"
-
-    loop = asyncio.get_event_loop()
-
-    apps = AppService(matrix_server="http://localhost:8008",
-                      access_token=access_token,
-                      loop=loop)
-
-    # Do some setup
-    loop.run_until_complete(apps.register_user("hangouts_test1"))
-    loop.run_until_complete(apps.matrix_client.join_room("#hangouts_test1:localhost",
-                                                         user_id="@hangouts_test1"))
-
-    web.run_app(apps.app, host='127.0.0.1', port=5000)
-
-    apps.client_session.close()
