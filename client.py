@@ -54,51 +54,65 @@ class MatrixClient:
 
         url = self._get_url(endpoint, api_path)
 
-        return self.session.request(method, url, **kwargs)
+        async with self.session.request(method, url, **kwargs) as resp:
+            return resp
 
     def _get_text_body(self, text, msgtype="m.text"):
         data = {"msgtype": msgtype,
                 "body": text}
         return self._jsonify(data)
 
-    async def send_message(self, room_id, message):
+    def _as_uid(self, uid):
+        return {'user_id': quote(uid)}
+
+    def _token_params(self):
+        return {"access_token": self.access_token}
+
+    async def send_message(self, room_id, message, user_id=None):
         """
         Send message
         """
-        transaction = quote(str(int(time() * 1000)))
         room_id = quote(room_id)
         event_type = quote("m.room.message")
 
-        path = f"rooms/{room_id}/send/{event_type}?access_token={self.access_token}"
+        path = f"rooms/{room_id}/send/{event_type}"
         message = self._get_text_body(message)
 
-        resp = await self._send("POST", path, api_path=self.room_endpoint, data=message)
-        async with resp as r:
-            return r
+        p = self._token_params()
+        if user_id:
+            p.update(self._as_uid(user_id))
+
+        resp = await self._send("POST", path, api_path=self.room_endpoint,
+                                data=message, params=p)
+        return resp
 
     async def get_room_id(self, room_alias):
         room_alias = quote(room_alias)
-        resp = self._send("GET", f"directory/room/{room_alias}", api_path=self.room_endpoint)
-        async with resp as r:
-            return r
+        resp = self._send("GET", f"directory/room/{room_alias}",
+                          api_path=self.room_endpoint)
+        return resp
 
-    async def join_room(self, room_alias):
+    async def join_room(self, room_alias, user_id=None):
         room_alias = quote(room_alias)
-        resp = await self._send("POST", f"join/{room_alias}?access_token={self.access_token}",
-                                api_path=self.room_endpoint)
-        async with resp as r:
-            return r
+        p = self._token_params()
+        if user_id:
+            p.update(self._as_uid(user_id))
+
+        resp = await self._send("POST", f"join/{room_alias}",
+                                api_path=self.room_endpoint,
+                                params=p)
+        return resp
 
     async def create_room(self, alias_name):
         """
         """
         alias_localpart = alias_name.split(":")[0][1:]
-        endpoint = f"createRoom?access_token={self.access_token}"
+        endpoint = f"createRoom"
 
         content = self._jsonify({"room_alias_name": alias_localpart})
         print(type(content), content)
 
         resp = await self._send("POST", endpoint,
-                                api_path=self.room_endpoint, data=content)
-        with resp as r:
-            return r
+                                api_path=self.room_endpoint,
+                                data=content, params=self._token_params())
+        return resp

@@ -19,7 +19,7 @@ sender_localpart: hangouts
 namespaces:
   users:
     - exclusive: true
-      regex: "#hangouts_.*"
+      regex: "@hangouts_.*"
   rooms: []
   aliases:
     - exclusive: true
