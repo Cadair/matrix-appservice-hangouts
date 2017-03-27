@@ -21,7 +21,8 @@ class AppService:
         self.loop = loop
 
         self.client_session = aiohttp.ClientSession(loop=self.loop)
-        self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
+        self.matrix_client = MatrixClient(matrix_server, access_token,
+                                          self.client_session)
         self.access_token = access_token
 
         self.app = web.Application(loop=self.loop)
@@ -41,10 +42,12 @@ class AppService:
             print("User: %s Room: %s" % (event["user_id"], event["room_id"]))
             print("Event Type: %s" % event["type"])
             print("Content: %s" % event["content"])
-            if "hangouts" not in event['user_id'] and "m.room.message" in event["type"]:
-                resp = await self.matrix_client.send_message(event["room_id"],
-                                                             "Hello {user_id}".format(user_id=event['user_id']),
-                                                             user_id="@hangouts_test1:localhost")
+            if "hangouts" not in event[
+                    'user_id'] and "m.room.message" in event["type"]:
+                resp = await self.matrix_client.send_message(
+                    event["room_id"],
+                    "Hello {user_id}".format(user_id=event['user_id']),
+                    user_id="@hangouts_test1:localhost")
 
         return web.Response(body=b"{}")
 
@@ -66,13 +69,18 @@ class AppService:
         """
         Register the user using the AS
         """
-        data = self.matrix_client._jsonify({'type': "m.login.application_service",
-                                            'username':quote(localpart)})
+        data = self.matrix_client._jsonify({
+            'type':
+            "m.login.application_service",
+            'username':
+            quote(localpart)
+        })
 
-        resp = await self.matrix_client._send("POST", "register",
-                                              api_path=self.matrix_client.room_endpoint,
-                                              params=self.matrix_client._token_params(),
-                                              data=data)
+        resp = await self.matrix_client._send(
+            "POST",
+            "register",
+            api_path=self.matrix_client.room_endpoint,
+            params=self.matrix_client._token_params(),
+            data=data)
         print(await resp.read())
         return resp
-
