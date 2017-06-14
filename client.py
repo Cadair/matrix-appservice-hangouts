@@ -7,9 +7,7 @@ import requests
 import aiohttp
 
 
-
 BASE_URL = "http://localhost:8008"
-API_ENDPOINT = "_matrix/client/api/v1/"
 
 
 class MatrixClient:
@@ -23,7 +21,6 @@ class MatrixClient:
 
         self.v1_endpoint = "_matrix/client/api/v1/"
         self.room_endpoint = "_matrix/client/r0/"
-
 
     def _get_url(self, endpoint, api_endpoint):
         end = urljoin(api_endpoint, endpoint)
