@@ -7,6 +7,7 @@ import aiohttp
 from aiohttp import web
 
 from client import MatrixClient
+from hangouts_client import HangoutsClient
 
 
 class AppService:
@@ -14,7 +15,7 @@ class AppService:
     Run the Matrix Appservice
     """
 
-    def __init__(self, *, matrix_server, access_token, loop=None):
+    def __init__(self, *, matrix_server, access_token, cookies, conversation_id, loop=None):
         # Set up a async loop
         if not loop:
             loop = asyncio.get_event_loop()
@@ -22,6 +23,8 @@ class AppService:
 
         self.client_session = aiohttp.ClientSession(loop=self.loop)
         self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
+        self.hangouts_client = HangoutsClient(cookies)
+        self.conversation_id = conversation_id
         self.access_token = access_token
 
         self.app = web.Application(loop=self.loop)
@@ -42,9 +45,8 @@ class AppService:
             print("Event Type: %s" % event["type"])
             print("Content: %s" % event["content"])
             if "hangouts" not in event['user_id'] and "m.room.message" in event["type"]:
-                resp = await self.matrix_client.send_message(event["room_id"],
-                                                             "Hello {user_id}".format(user_id=event['user_id']),
-                                                             user_id="@hangouts_test1:localhost")
+                resp = await self.hangouts_client.send_message(self.conversation_id,
+                                                               event['content']['body'])
 
         return web.Response(body=b"{}")
 
@@ -58,7 +60,7 @@ class AppService:
     async def query_userid(self, request):
         userid = request.match_info["userid"]
 
-        resp = await register_user(userid)
+        resp = await self.register_user(userid)
 
         return web.Response(body=b"{}")
 
@@ -73,6 +75,4 @@ class AppService:
                                               api_path=self.matrix_client.room_endpoint,
                                               params=self.matrix_client._token_params(),
                                               data=data)
-        print(await resp.read())
         return resp
-
