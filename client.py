@@ -70,7 +70,10 @@ class MatrixClient:
         """
         Send message
         """
-        room_id = quote(room_id)
+        if room_id.startswith('#'):
+            room_id = self.get_room_id(room_id)
+        else:
+            room_id = quote(room_id)
         event_type = quote("m.room.message")
 
         path = f"rooms/{room_id}/send/{event_type}"

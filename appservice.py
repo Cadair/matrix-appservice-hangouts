@@ -1,13 +1,17 @@
-# app_service.py:
-
-import json
-from urllib.parse import quote
 import asyncio
+import logging
+
+from urllib.parse import quote
 import aiohttp
 from aiohttp import web
 
 from client import MatrixClient
 from hangouts_client import HangoutsClient
+
+log = logging.getLogger("hangouts_as")
+
+
+__all__ = ['AppService']
 
 
 class AppService:
@@ -23,7 +27,7 @@ class AppService:
 
         self.client_session = aiohttp.ClientSession(loop=self.loop)
         self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
-        self.hangouts_client = HangoutsClient(cookies)
+        self.hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
         self.conversation_id = conversation_id
         self.access_token = access_token
 
@@ -32,23 +36,30 @@ class AppService:
 
     def routes(self):
         self.app.router.add_route('PUT', "/transactions/{transaction}",
-                                  self.recieve_transaction)
+                                  self.recieve_matrix_transaction)
         self.app.router.add_route('GET', "/rooms/{alias}", self.room_alias)
         self.app.router.add_route('GET', "/users/{userid}", self.query_userid)
 
-    async def recieve_transaction(self, request):
-        transaction = request.match_info["transaction"]
+    async def recieve_matrix_transaction(self, request):
         json = await request.json()
         events = json["events"]
         for event in events:
-            print("User: %s Room: %s" % (event["user_id"], event["room_id"]))
-            print("Event Type: %s" % event["type"])
-            print("Content: %s" % event["content"])
+            log.info("User: %s Room: %s" % (event["user_id"], event["room_id"]))
+            log.info("Event Type: %s" % event["type"])
+            log.info("Content: %s" % event["content"])
             if "hangouts" not in event['user_id'] and "m.room.message" in event["type"]:
                 resp = await self.hangouts_client.send_message(self.conversation_id,
                                                                event['content']['body'])
 
         return web.Response(body=b"{}")
+
+    async def recieve_hangouts_event(self, event):
+        log.info("Received Message on Hangouts {}".format(event.text))
+        resp = await self.matrix_client.send_message("!ItEGspVUZCZOwPiyZY:localhost",
+                                                     event.text,
+                                                     user_id="@hangouts_test1:localhost")
+
+        return resp
 
     async def room_alias(self, request):
         alias = request.match_info["alias"]
@@ -69,7 +80,7 @@ class AppService:
         Register the user using the AS
         """
         data = self.matrix_client._jsonify({'type': "m.login.application_service",
-                                            'username':quote(localpart)})
+                                            'username': quote(localpart)})
 
         resp = await self.matrix_client._send("POST", "register",
                                               api_path=self.matrix_client.room_endpoint,
