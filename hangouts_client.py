@@ -15,12 +15,14 @@ class HangoutsClient:
 
         self.client = hangups.Client(cookies)
 
+        self.loop.run_until_complete(self.setup())
+
         self.recieve_event_handler = recieve_event_handler
 
     async def setup(self):
         """
+        Setup stuff that's async
         """
-        # Spawn a task for hangups to run in parallel with the example coroutine.
         task = asyncio.ensure_future(self.client.connect())
 
         # Wait for hangups to either finish connecting or raise an exception.
@@ -31,8 +33,6 @@ class HangoutsClient:
         )
         await asyncio.gather(*done)
         await asyncio.ensure_future(self.get_users_conversations())
-
-        self.conversation_list.on_event.add_observer(self.on_event)
 
     async def get_users_conversations(self):
         """
@@ -45,14 +45,19 @@ class HangoutsClient:
         self.user_list = user_list
         self.conversation_list = conversation_list
 
-    async def send_message(self, conversation_id, message):
+    def get_conversation(self, conversation_id):
+        """
+        Return a Conversation object from the list.
+        """
+        return self.conversation_list.get(conversation_id)
+
+    async def send_message(self, conversation, message):
         """
         Send a message to a conversation.
         """
-        conv = self.conversation_list.get(conversation_id)
 
         cms = hangups.ChatMessageSegment.from_str(message)
-        await conv.send_message(cms)
+        await conversation.send_message(cms)
 
     async def on_event(self, conv_event):
         """
@@ -61,4 +66,4 @@ class HangoutsClient:
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
         if not user.is_self:
-            await self.recieve_event_handler(conv_event)
+            await self.recieve_event_handler(conv, user, conv_event)

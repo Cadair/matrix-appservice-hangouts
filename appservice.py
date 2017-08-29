@@ -28,11 +28,16 @@ class AppService:
         self.client_session = aiohttp.ClientSession(loop=self.loop)
         self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
         self.hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
-        self.conversation_id = conversation_id
         self.access_token = access_token
 
         self.app = web.Application(loop=self.loop)
         self.routes()
+
+        # TODO: These need to be dynamic
+        self.conversation_id = conversation_id
+        self.matrix_room_alias = "#hangouts_test1:localhost"
+
+        self.loop.run_until_complete(self.join_hangouts_conversation(self.conversation_id, self.matrix_room_alias))
 
     def routes(self):
         self.app.router.add_route('PUT', "/transactions/{transaction}",
@@ -40,24 +45,85 @@ class AppService:
         self.app.router.add_route('GET', "/rooms/{alias}", self.room_alias)
         self.app.router.add_route('GET', "/users/{userid}", self.query_userid)
 
+    async def join_hangouts_conversation(self, conversation_id, matrix_room_alias):
+        """
+        Given a hangouts conversation and a matrix room, perform joining operations.
+        """
+        # Ensure given matrix room exists.
+        await self.matrix_client.create_room(matrix_room_alias)
+
+        # Join the hangouts conversation
+        self.hangouts_conversation = self.hangouts_client.get_conversation(conversation_id)
+        conv = self.hangouts_conversation
+        conv.on_event.add_observer(self.hangouts_client.on_event)
+
+        log.info(dir(conv))
+        log.info(conv.name)
+
+        name = None
+        if conv.name:
+            name = conv.name
+        elif len(conv.users) == 2:
+            for user in conv.users:
+                if not user.is_self:
+                    name = user.full_name
+
+        room_alias = f"#hangouts_{conv.id_}:localhost"
+        log.info(f"Creating room: {room_alias}")
+        await self.matrix_client.create_room(room_alias)
+        if name:
+            resp = await self.matrix_client.set_room_name(room_alias, name, user_id="@hangouts:localhost")
+            log.info(resp)
+            log.info(await resp.json())
+
+        for user in conv.users:
+            if not user.is_self:
+                user_id = f"hangouts_{user.id_.gaia_id}"
+                resp = await self.register_user(user_id)
+                log.info(await resp.json())
+                # user_id for join is different to register!
+                user_id = f"@{user_id}:localhost"
+                log.info(f"Creating user: {user_id}")
+                await self.matrix_client.set_display_name(user_id, user.full_name)
+
+                # Download Hangouts profile picture
+                async with self.client_session.request("GET", f"https:{user.photo_url}") as resp:
+                    log.info(resp)
+                    data = await resp.read()
+                # Upload to homeserver
+                resp = await self.matrix_client.media_upload(data, resp.content_type,
+                                                             user_id=user_id)
+                json = await resp.json()
+                avatar_url = json['content_uri']
+                # Set profile picture
+                await self.matrix_client.set_avatar_url(user_id, avatar_url)
+                await self.matrix_client.join_room(room_alias,
+                                                   user_id=user_id)
+
     async def recieve_matrix_transaction(self, request):
         json = await request.json()
+        # log.info("Received AS Transaction: \n{}\n".format(json))
         events = json["events"]
         for event in events:
             log.info("User: %s Room: %s" % (event["user_id"], event["room_id"]))
             log.info("Event Type: %s" % event["type"])
             log.info("Content: %s" % event["content"])
             if "hangouts" not in event['user_id'] and "m.room.message" in event["type"]:
-                resp = await self.hangouts_client.send_message(self.conversation_id,
+                resp = await self.hangouts_client.send_message(self.hangouts_conversation,
                                                                event['content']['body'])
 
         return web.Response(body=b"{}")
 
-    async def recieve_hangouts_event(self, event):
-        log.info("Received Message on Hangouts {}".format(event.text))
-        resp = await self.matrix_client.send_message("!ItEGspVUZCZOwPiyZY:localhost",
+    async def recieve_hangouts_event(self, conv, user, event):
+        log.info("Received Message on Hangouts: '{}'".format(event.text))
+        room_alias = f"#hangouts_{conv.id_}:localhost"
+        user_id = f"@hangouts_{user.id_.gaia_id}:localhost"
+        log.info(room_alias)
+        log.info(user_id)
+        room_id = await self.matrix_client.get_room_id(room_alias)
+        resp = await self.matrix_client.send_message(room_id,
                                                      event.text,
-                                                     user_id="@hangouts_test1:localhost")
+                                                     user_id=user_id)
 
         return resp
 
@@ -92,5 +158,4 @@ class AppService:
             api_path=self.matrix_client.room_endpoint,
             params=self.matrix_client._token_params(),
             data=data)
-        print(await resp.read())
         return resp

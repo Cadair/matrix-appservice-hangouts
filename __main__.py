@@ -31,12 +31,12 @@ apps = AppService(matrix_server="http://localhost:8008",
                   loop=loop)
 
 # Do some setup
-loop.run_until_complete(apps.hangouts_client.setup())
-loop.run_until_complete(apps.register_user("hangouts_test1"))
-loop.run_until_complete(apps.matrix_client.create_room("#appservice_hangouts:localhost"))
-loop.run_until_complete(apps.matrix_client.join_room("#appservice_hangouts:localhost",
-                                                     user_id="@hangouts_test1:localhost"))
+loop.run_until_complete(apps.register_user("hangouts_appservice"))
+loop.run_until_complete(apps.matrix_client.create_room("#hangouts_appservice:localhost"))
+loop.run_until_complete(apps.matrix_client.join_room("#hangouts_appservice:localhost",
+                                                     user_id="@hangouts_appservice:localhost"))
 
+loop.run_until_complete(apps.register_user("hangouts_test1"))
 loop.run_until_complete(apps.matrix_client.create_room("#hangouts_test1:localhost"))
 loop.run_until_complete(apps.matrix_client.join_room("#hangouts_test1:localhost",
                                                      user_id="@hangouts_test1:localhost"))
