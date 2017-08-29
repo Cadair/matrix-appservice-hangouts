@@ -80,23 +80,27 @@ class AppService:
             if not user.is_self:
                 user_id = f"hangouts_{user.id_.gaia_id}"
                 resp = await self.register_user(user_id)
-                log.info(await resp.json())
                 # user_id for join is different to register!
                 user_id = f"@{user_id}:localhost"
                 log.info(f"Creating user: {user_id}")
                 await self.matrix_client.set_display_name(user_id, user.full_name)
 
-                # Download Hangouts profile picture
-                async with self.client_session.request("GET", f"https:{user.photo_url}") as resp:
-                    log.info(resp)
-                    data = await resp.read()
-                # Upload to homeserver
-                resp = await self.matrix_client.media_upload(data, resp.content_type,
-                                                             user_id=user_id)
-                json = await resp.json()
-                avatar_url = json['content_uri']
-                # Set profile picture
-                await self.matrix_client.set_avatar_url(user_id, avatar_url)
+                # If we don't have a profile picture already set one
+                if not await self.matrix_client.get_avatar_url(user_id):
+                    # Download Hangouts profile picture
+                    async with self.client_session.request("GET", f"https:{user.photo_url}") as resp:
+                        log.info(resp)
+                        data = await resp.read()
+
+                    # Upload to homeserver
+                    resp = await self.matrix_client.media_upload(data, resp.content_type,
+                                                                 user_id=user_id)
+                    json = await resp.json()
+                    avatar_url = json['content_uri']
+
+                    # Set profile picture
+                    await self.matrix_client.set_avatar_url(user_id, avatar_url)
+
                 await self.matrix_client.join_room(room_alias,
                                                    user_id=user_id)
 

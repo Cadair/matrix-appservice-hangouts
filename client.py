@@ -166,6 +166,12 @@ class MatrixClient:
                                 params=p)
         return resp
 
+    async def get_avatar_url(self, user_id):
+        user_id = quote(user_id)
+        resp = await self._send("GET", f"profile/{user_id}/avatar_url")
+        content = await resp.json()
+        return content.get('avatar_url', None)
+
     def media_upload(self, content, content_type, user_id=None):
         p = self._token_params()
         if user_id:
