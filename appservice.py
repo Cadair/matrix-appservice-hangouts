@@ -35,9 +35,8 @@ class AppService:
 
         # TODO: These need to be dynamic
         self.conversation_id = conversation_id
-        self.matrix_room_alias = "#hangouts_test1:localhost"
 
-        self.loop.run_until_complete(self.join_hangouts_conversation(self.conversation_id, self.matrix_room_alias))
+        self.loop.run_until_complete(self.join_hangouts_conversation(self.conversation_id))
 
     def routes(self):
         self.app.router.add_route('PUT', "/transactions/{transaction}",
@@ -45,21 +44,21 @@ class AppService:
         self.app.router.add_route('GET', "/rooms/{alias}", self.room_alias)
         self.app.router.add_route('GET', "/users/{userid}", self.query_userid)
 
-    async def join_hangouts_conversation(self, conversation_id, matrix_room_alias):
+    async def join_hangouts_conversation(self, conversation_id):
         """
         Given a hangouts conversation and a matrix room, perform joining operations.
         """
-        # Ensure given matrix room exists.
-        await self.matrix_client.create_room(matrix_room_alias)
-
         # Join the hangouts conversation
         self.hangouts_conversation = self.hangouts_client.get_conversation(conversation_id)
         conv = self.hangouts_conversation
         conv.on_event.add_observer(self.hangouts_client.on_event)
 
-        log.info(dir(conv))
-        log.info(conv.name)
+        # Create the room based on conversation ID
+        room_alias = f"#hangouts_{conv.id_}:localhost"
+        log.info(f"Creating room: {room_alias}")
+        await self.matrix_client.create_room(room_alias)
 
+        # Set the conversation name
         name = None
         if conv.name:
             name = conv.name
@@ -67,15 +66,12 @@ class AppService:
             for user in conv.users:
                 if not user.is_self:
                     name = user.full_name
-
-        room_alias = f"#hangouts_{conv.id_}:localhost"
-        log.info(f"Creating room: {room_alias}")
-        await self.matrix_client.create_room(room_alias)
         if name:
-            resp = await self.matrix_client.set_room_name(room_alias, name, user_id="@hangouts:localhost")
-            log.info(resp)
-            log.info(await resp.json())
+            resp = await self.matrix_client.set_room_name(room_alias,
+                                                          name,
+                                                          user_id="@hangouts:localhost")
 
+        # Register Users
         for user in conv.users:
             if not user.is_self:
                 user_id = f"hangouts_{user.id_.gaia_id}"
