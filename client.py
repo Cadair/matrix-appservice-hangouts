@@ -1,6 +1,4 @@
 import json
-import os.path
-from time import time
 from urllib.parse import urljoin, quote
 
 import requests

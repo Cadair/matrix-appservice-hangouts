@@ -79,11 +79,18 @@ class AppService:
         """
         Register the user using the AS
         """
-        data = self.matrix_client._jsonify({'type': "m.login.application_service",
-                                            'username': quote(localpart)})
+        data = self.matrix_client._jsonify({
+            'type':
+            "m.login.application_service",
+            'username':
+            quote(localpart)
+        })
 
-        resp = await self.matrix_client._send("POST", "register",
-                                              api_path=self.matrix_client.room_endpoint,
-                                              params=self.matrix_client._token_params(),
-                                              data=data)
+        resp = await self.matrix_client._send(
+            "POST",
+            "register",
+            api_path=self.matrix_client.room_endpoint,
+            params=self.matrix_client._token_params(),
+            data=data)
+        print(await resp.read())
         return resp
