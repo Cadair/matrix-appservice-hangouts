@@ -1,3 +1,10 @@
+- name: Fix tricksy package
+  apt:
+    name: apt-transport-https 
+    update_cache: no
+    force: yes
+    allow_unauthenticated: yes
+
 - name: Add Jessie Backports
   apt_repository:
       repo: deb http://ftp.debian.org/debian jessie-backports main

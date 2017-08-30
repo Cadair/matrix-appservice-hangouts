@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from functools import partial
 from urllib.parse import quote
 
 import aiohttp
@@ -19,29 +20,33 @@ class AppService:
     Run the Matrix Appservice
     """
 
-    def __init__(self, *, matrix_server, access_token, cookies, conversation_id, loop=None):
+    def __init__(self, *, matrix_server, access_token, cookies, loop=None):
         # Set up a async loop
         if not loop:
             loop = asyncio.get_event_loop()
         self.loop = loop
 
+        # Setup clients
         self.client_session = aiohttp.ClientSession(loop=self.loop)
         self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
         self.hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
+        self.hangouts_client.conversation_list.on_event.add_observer(self.hangouts_client.on_event)
         self.access_token = access_token
+
+        # Keep a mapping of room_ids > hangouts Conversations just because it's easier
         self.conversation_mapping = {}
+        # Keep a mapping of matrix users to admin channels
+        # TODO: This needs to persist over appservice reboots
+        self.admin_channels = {}
+
+        # Event types mapped to methods
         self._matrix_event_dispatch = {}
         self._matrix_event_dispatch['m.room.message'] = self.matrix_room_message
         self._matrix_event_dispatch['m.room.member'] = self.matrix_room_member
 
-
+        # Setup web server to listen for appservice calls
         self.app = web.Application(loop=self.loop)
         self.routes()
-
-        # TODO: These need to be dynamic
-        self.conversation_id = conversation_id
-
-        self.loop.run_until_complete(self.join_hangouts_conversation(self.conversation_id))
 
     def routes(self):
         self.app.router.add_route('PUT', "/transactions/{transaction}",
@@ -53,15 +58,15 @@ class AppService:
         """
         Given a hangouts conversation, perform joining operations.
         """
+        log.debug(f"Joining Hangouts Conversation: {conversation_id}")
         # Join the hangouts conversation
         conv = self.hangouts_client.get_conversation(conversation_id)
-        conv.on_event.add_observer(self.hangouts_client.on_event)
 
         # Create the room based on conversation ID
         room_alias = f"#hangouts_{conv.id_}:localhost"
         log.info(f"Creating room: {room_alias}")
-        room_id = await self.matrix_client.get_room_id(room_alias)
         await self.matrix_client.create_room(room_alias)
+        room_id = await self.matrix_client.get_room_id(room_alias)
 
         # Add this conversation to the mapping.
         self.conversation_mapping[room_id] = conv
@@ -127,12 +132,16 @@ class AppService:
         Receive an Appservice push matrix event.
         """
         json = await request.json()
-        log.info(json)
         events = json["events"]
         for event in events:
-            log.info("User: %s Room: %s" % (event["user_id"], event["room_id"]))
-            log.info("Event Type: %s" % event["type"])
-            log.info("Content: %s" % event["content"])
+            log.debug(
+f"""
+Received Matrix Transaction:
+\t Event: {event['type']},
+\t User: {event['user_id']},
+\t Room: {event['room_id']},
+\t Content: {event['content']}
+""")
 
             meth = self._matrix_event_dispatch.get(event['type'], None)
             if meth:
@@ -148,6 +157,15 @@ class AppService:
         if "hangouts" not in event['user_id'] and event['room_id'] in self.conversation_mapping:
             resp = await self.hangouts_client.send_message(self.conversation_mapping[event['room_id']],
                                                            event['content']['body'])
+            return resp
+
+        elif event['room_id'] in self.admin_channels.values():
+            # Handle admin channel messages
+            user_id = event['user_id']
+            # Get hangouts client for user
+            hangouts_client = self.hangouts_client
+            # Process message
+            resp = await self.handle_admin_message(event, hangouts_client)
 
             return resp
 
@@ -157,32 +175,77 @@ class AppService:
         """
         content = event['content']
         if content['membership'] == "invite" and content['is_direct']:
-            # We have been invited to a private chat. Join it.
-            resp = await self.matrix_client.join_room(event['room_id'])
+            # If we already have an active admin channel with this user, don't
+            # join another.
+            user_id = event['user_id']
+            if user_id not in self.admin_channels:
+                resp = await self.matrix_client.join_room(event['room_id'])
+                self.admin_channels[user_id] = event['room_id']
+            else:
+                resp = await self.matrix_client.send_message(self.admin_channels['user_id'],
+                                                             "Hello")
 
             return resp
 
+    async def handle_admin_message(self, event, hangouts_client):
+        """
+        Process an admin channel message.
+        """
+        respond = partial(self.matrix_client.send_message, event['room_id'])
+
+        message = event['content']['body']
+        if "list conversations" in message:
+            convs = hangouts_client.conversation_list.get_all()
+            line_template = "{name}, {uri}\n"
+            output = ""
+            for conv in convs:
+                name = ''
+                if conv.name:
+                    name = conv.name
+                elif len(conv.users) == 2:
+                    for user in conv.users:
+                        if not user.is_self:
+                            name = user.full_name
+                log.info(f"{conv.id_}: {name}")
+                uri = f"#hangouts_{conv.id_}:localhost"
+
+                output += line_template.format(name=name, uri=uri)
+
+            await respond(output)
+
     async def recieve_hangouts_event(self, conv, user, event):
-        log.info("Received Message on Hangouts: '{}'".format(event.text))
+        log.debug(
+f"""
+Received Hangouts Event:
+\t Conversation: {conv.id_},
+\t User: {user.full_name} ({user.id_.gaia_id}),
+\t Message: {event.text}
+""")
         room_alias = f"#hangouts_{conv.id_}:localhost"
         user_id = f"@hangouts_{user.id_.gaia_id}:localhost"
-        log.info(room_alias)
-        log.info(user_id)
         room_id = await self.matrix_client.get_room_id(room_alias)
-        resp = await self.matrix_client.send_message(room_id,
-                                                     event.text,
-                                                     user_id=user_id)
+        if room_id:
+            resp = await self.matrix_client.send_message(room_id,
+                                                         event.text,
+                                                         user_id=user_id)
+        else:
+            log.error("No Room found")
 
         return resp
 
     async def room_alias(self, request):
         alias = request.match_info["alias"]
 
-        rep = await self.matrix_client.create_room(alias)
+        conversation_id = alias[alias.find('_')+1:alias.find(':')]
+        log.info(f"Room join Request for {conversation_id}")
 
-        return web.Response(body=b"{}")
+        if self.hangouts_client.conversation_list.get(conversation_id):
+            await self.join_hangouts_conversation(conversation_id)
+
+            return web.Response(body=b"{}")
 
     async def query_userid(self, request):
+        return None
         userid = request.match_info["userid"]
 
         resp = await self.register_user(userid)

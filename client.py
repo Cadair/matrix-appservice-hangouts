@@ -114,7 +114,8 @@ class MatrixClient:
         resp = await self._send("GET", f"directory/room/{room_alias}",
                                 api_path=self.room_endpoint)
         json = await resp.json()
-        return json['room_id']
+        if 'room_id' in json:
+            return json['room_id']
 
     async def join_room(self, room_alias, user_id=None):
         room_alias = quote(room_alias)
