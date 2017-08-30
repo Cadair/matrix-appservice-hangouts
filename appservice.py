@@ -1,7 +1,7 @@
 import asyncio
 import logging
-
 from urllib.parse import quote
+
 import aiohttp
 from aiohttp import web
 
@@ -29,6 +29,11 @@ class AppService:
         self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
         self.hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
         self.access_token = access_token
+        self.conversation_mapping = {}
+        self._matrix_event_dispatch = {}
+        self._matrix_event_dispatch['m.room.message'] = self.matrix_room_message
+        self._matrix_event_dispatch['m.room.member'] = self.matrix_room_member
+
 
         self.app = web.Application(loop=self.loop)
         self.routes()
@@ -46,17 +51,20 @@ class AppService:
 
     async def join_hangouts_conversation(self, conversation_id):
         """
-        Given a hangouts conversation and a matrix room, perform joining operations.
+        Given a hangouts conversation, perform joining operations.
         """
         # Join the hangouts conversation
-        self.hangouts_conversation = self.hangouts_client.get_conversation(conversation_id)
-        conv = self.hangouts_conversation
+        conv = self.hangouts_client.get_conversation(conversation_id)
         conv.on_event.add_observer(self.hangouts_client.on_event)
 
         # Create the room based on conversation ID
         room_alias = f"#hangouts_{conv.id_}:localhost"
         log.info(f"Creating room: {room_alias}")
+        room_id = await self.matrix_client.get_room_id(room_alias)
         await self.matrix_client.create_room(room_alias)
+
+        # Add this conversation to the mapping.
+        self.conversation_mapping[room_id] = conv
 
         # Set the conversation name
         name = None
@@ -79,40 +87,80 @@ class AppService:
                 # user_id for join is different to register!
                 user_id = f"@{user_id}:localhost"
                 log.info(f"Creating user: {user_id}")
+
+                # Set the matrix users display name
                 await self.matrix_client.set_display_name(user_id, user.full_name)
 
-                # If we don't have a profile picture already set one
-                if not await self.matrix_client.get_avatar_url(user_id):
-                    # Download Hangouts profile picture
-                    async with self.client_session.request("GET", f"https:{user.photo_url}") as resp:
-                        log.info(resp)
-                        data = await resp.read()
+                # Set the matrix users profile picture (if needed)
+                await self.set_matrix_profile_image(user_id, user.photo_url)
 
-                    # Upload to homeserver
-                    resp = await self.matrix_client.media_upload(data, resp.content_type,
-                                                                 user_id=user_id)
-                    json = await resp.json()
-                    avatar_url = json['content_uri']
-
-                    # Set profile picture
-                    await self.matrix_client.set_avatar_url(user_id, avatar_url)
-
+                # Join the matrix user to the room
                 await self.matrix_client.join_room(room_alias,
                                                    user_id=user_id)
 
+    async def set_matrix_profile_image(self, user_id, image_url, force=False):
+        """
+        Given a matrix user id and a remote image, download the image from the
+        remote source, and upload it to the media store on the homeserver and
+        set it as the users avatar url.
+        """
+        # If we don't have a profile picture already set one
+        if force or not await self.matrix_client.get_avatar_url(user_id) and image_url:
+            # Download Hangouts profile picture
+            async with self.client_session.request("GET", f"https:{image_url}") as resp:
+                log.info(resp)
+                data = await resp.read()
+
+            # Upload to homeserver
+            resp = await self.matrix_client.media_upload(data, resp.content_type,
+                                                         user_id=user_id)
+            json = await resp.json()
+            avatar_url = json['content_uri']
+
+            # Set profile picture
+            resp = await self.matrix_client.set_avatar_url(user_id, avatar_url)
+
+            return resp
+
     async def recieve_matrix_transaction(self, request):
+        """
+        Receive an Appservice push matrix event.
+        """
         json = await request.json()
-        # log.info("Received AS Transaction: \n{}\n".format(json))
+        log.info(json)
         events = json["events"]
         for event in events:
             log.info("User: %s Room: %s" % (event["user_id"], event["room_id"]))
             log.info("Event Type: %s" % event["type"])
             log.info("Content: %s" % event["content"])
-            if "hangouts" not in event['user_id'] and "m.room.message" in event["type"]:
-                resp = await self.hangouts_client.send_message(self.hangouts_conversation,
-                                                               event['content']['body'])
+
+            meth = self._matrix_event_dispatch.get(event['type'], None)
+            if meth:
+                resp = await meth(event)
 
         return web.Response(body=b"{}")
+
+    async def matrix_room_message(self, event):
+        """
+        Handle 'm.room.message' events.
+        """
+        # Handle messages
+        if "hangouts" not in event['user_id'] and event['room_id'] in self.conversation_mapping:
+            resp = await self.hangouts_client.send_message(self.conversation_mapping[event['room_id']],
+                                                           event['content']['body'])
+
+            return resp
+
+    async def matrix_room_member(self, event):
+        """
+        Handle 'm.room.member' events.
+        """
+        content = event['content']
+        if content['membership'] == "invite" and content['is_direct']:
+            # We have been invited to a private chat. Join it.
+            resp = await self.matrix_client.join_room(event['room_id'])
+
+            return resp
 
     async def recieve_hangouts_event(self, conv, user, event):
         log.info("Received Message on Hangouts: '{}'".format(event.text))
