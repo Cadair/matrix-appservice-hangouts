@@ -50,7 +50,12 @@ class MatrixClient:
 
         async with self.session.request(method, url, **kwargs) as resp:
             await resp.read()
-            return resp
+
+        if resp.status != 200:
+            log.error(resp)
+            log.error(await resp.json())
+
+        return resp
 
     async def send_state_event(self, room_id, event_type, content, state_key="",
                                timestamp=None, params=None, **kwargs):
@@ -93,7 +98,7 @@ class MatrixClient:
         Send message
         """
         if room_id.startswith('#'):
-            room_id = self.get_room_id(room_id)
+            room_id = await self.get_room_id(room_id)
         else:
             room_id = quote(room_id)
         event_type = quote("m.room.message")
@@ -123,22 +128,38 @@ class MatrixClient:
         if user_id:
             p.update(self._as_uid(user_id))
 
+
         resp = await self._send("POST", f"join/{room_alias}",
                                 api_path=self.room_endpoint,
                                 params=p)
         return resp
 
-    async def create_room(self, alias_name):
+    async def create_room(self, alias_name, invitees=None):
         """
         """
         alias_localpart = alias_name.split(":")[0][1:]
         endpoint = f"createRoom"
 
-        content = self._jsonify({"room_alias_name": alias_localpart})
+        content = {"room_alias_name": alias_localpart}
+        if invitees:
+            content["invite"] = invitees
+        content = self._jsonify(content)
 
         resp = await self._send("POST", endpoint,
                                 api_path=self.room_endpoint,
                                 data=content, params=self._token_params())
+        return resp
+
+    async def invite_user(self, room_id, user_id):
+        """Perform POST /rooms/$room_id/invite
+        Args:
+            room_id(str): The room ID
+            user_id(str): The user ID of the invitee
+        """
+        body = {
+            "user_id": user_id
+        }
+        resp = await self._send("POST", f"rooms/{room_id}/invite", data=body)
         return resp
 
     async def set_display_name(self, user_id, display_name):
@@ -202,3 +223,14 @@ class MatrixClient:
             p.update(self._as_uid(user_id))
         resp = await self.send_state_event(room_id, "m.room.name", body, params=p)
         return resp
+
+    async def get_room_members(self, room_id, user_id=None):
+        """Get the list of members for this room.
+        Args:
+            room_id (str): The room to get the member events for.
+        """
+        p = self._token_params()
+        if user_id:
+            p.update(self._as_uid(user_id))
+        resp  = await self._send("GET", "rooms/{}/members".format(quote(room_id)), params=p)
+        return await resp.json()

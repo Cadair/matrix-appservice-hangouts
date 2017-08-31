@@ -8,14 +8,65 @@ log = logging.getLogger("hangouts_as")
 
 
 class HangoutsClient:
+    @staticmethod
+    async def login(refresh_token, client_session):
+        token_request_data = {
+            'client_id': hangups.auth.OAUTH2_CLIENT_ID,
+            'client_secret': hangups.auth.OAUTH2_CLIENT_SECRET,
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token,
+        }
+        async with client_session.request("POST",
+                                          hangups.auth.OAUTH2_TOKEN_REQUEST_URL,
+                                          headers={'user-agent': hangups.auth.USER_AGENT},
+                                          data=token_request_data) as resp:
+            json = await resp.json()
+            access_token = json['access_token']
+
+        headers = {'Authorization': 'Bearer {}'.format(access_token)}
+        async with client_session.request("GET",
+                    'https://accounts.google.com/accounts/OAuthLogin?source=hangups&issueuberauth=1',
+                    headers=headers) as resp:
+            uberauth = await resp.text()
+
+        async with client_session.request("GET", ('https://accounts.google.com/MergeSession?'
+                                                  'service=mail&'
+                                                  'continue=http://www.google.com&uberauth={}')
+                                          .format(uberauth), headers=headers) as resp:
+            await resp.read()
+
+        # This is insane but it works
+        cookies = {}
+        for cookie in client_session.cookie_jar:
+            cookies[cookie.key] = cookie.value
+        filtered = client_session.cookie_jar.filter_cookies('https://google.com')
+        cookies2 = {}
+        for key in filtered:
+            cookies2[key] = cookies[key]
+
+        return cookies2
+
+    @classmethod
+    async def init_from_refresh_token(cls,
+                                      refresh_token,
+                                      recieve_event_handler,
+                                      loop,
+                                      client_session):
+        """
+        Login and make a thing
+        """
+        cookies = await cls.login(refresh_token, client_session)
+        client = cls(cookies, recieve_event_handler, loop=loop)
+        await client.setup()
+        return client
+
     def __init__(self, cookies, recieve_event_handler, loop=None):
         if not loop:
             loop = asyncio.get_event_loop()
         self.loop = loop
 
+        self.cookies = cookies
         self.client = hangups.Client(cookies)
-
-        self.loop.run_until_complete(self.setup())
 
         self.recieve_event_handler = recieve_event_handler
 
@@ -33,6 +84,10 @@ class HangoutsClient:
         )
         await asyncio.gather(*done)
         await asyncio.ensure_future(self.get_users_conversations())
+        self.conversation_list.on_event.add_observer(self.on_event)
+
+    async def close(self):
+        await self.client.disconnect()
 
     async def get_users_conversations(self):
         """

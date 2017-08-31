@@ -41,7 +41,10 @@
   command: python -m synapse.app.homeserver --server-name localhost --config-path homeserver.yaml --generate-config --report-stats=no chdir=/etc/synapse creates=/etc/synapse/homeserver.db
 
 - name: Copy homeserver.yaml
-  template: src=templates/homeserver.yaml dest=/etc/synapse/homeserver.yaml
+  template:
+    src: templates/homeserver.yaml
+    dest: /etc/synapse/homeserver.yaml
+    force: yes
 
 - name: Start Synapse
   command: sudo synctl start /etc/synapse/homeserver.yaml

@@ -89,3 +89,4 @@ ENV/
 .ropeproject
 .vagrant
 ansible/playbook.retry
+.hangouts_cache.yml
