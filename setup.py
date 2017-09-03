@@ -14,7 +14,10 @@ setuptools.setup(
     packages=setuptools.find_packages(),
 
     install_requires=['aiohttp',
-                      ''],
+                      'hangups',
+                      'ruamel.yaml',
+                      'bidict',
+                      'click'],
 
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
