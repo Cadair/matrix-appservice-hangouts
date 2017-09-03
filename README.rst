@@ -60,6 +60,21 @@ Requirements
 * bidict
 
 
+Testing and Development
+#######################
+
+This repo also contains configuration for a vagrant VM running a matrix
+homeserver, this can be used to develop or test the appservice. It can be run
+with:
+
+.. code-block:: none
+
+   $ vagrant up --provision
+
+You can then connect your matrix client to the address `http://localhost:8008`
+with the username `@admin:localhost` and password `admin`.
+
+
 Compatibility
 -------------
 
