@@ -5,8 +5,6 @@ from functools import partial
 from urllib.parse import quote
 
 import aiohttp
-import hangups
-import requests
 from aiohttp import web
 from bidict import bidict
 from ruamel.yaml import YAML
