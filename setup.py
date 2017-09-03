@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(
-    name="matrix-appservice-hangouts",
+    name="matrix_appservice_hangouts",
     version="0.1.0",
     url="https://github.com/cadair/matrix-appservice-hangouts",
 
@@ -23,4 +23,8 @@ setuptools.setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
+    entry_points='''
+        [console_scripts]
+        hangoutsas=matrix_appservice_hangouts.__main__:main
+    ''',
 )

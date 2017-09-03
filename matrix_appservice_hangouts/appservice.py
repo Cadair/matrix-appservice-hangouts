@@ -9,8 +9,8 @@ from aiohttp import web
 from bidict import bidict
 from ruamel.yaml import YAML
 
-from client import MatrixClient
-from hangouts_client import HangoutsClient
+from .matrix_client import MatrixClient
+from .hangouts_client import HangoutsClient
 
 log = logging.getLogger("hangouts_as")
 
@@ -23,7 +23,7 @@ class AppService:
     Run the Matrix Appservice
     """
 
-    def __init__(self, *, matrix_server, server_name, access_token,
+    def __init__(self, *, matrix_server, server_domain, access_token,
                  cache_path=None, loop=None):
         # Set up a async loop
         if not loop:
@@ -38,7 +38,7 @@ class AppService:
         self.client_session = aiohttp.ClientSession(loop=self.loop)
         self.matrix_client = MatrixClient(matrix_server, access_token, self.client_session)
         self.access_token = access_token
-        self.server_name = server_name
+        self.server_name = server_domain
         self.hangouts_clients = {}
         self.login_existing_clients()
 
