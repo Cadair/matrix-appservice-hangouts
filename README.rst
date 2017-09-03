@@ -48,7 +48,7 @@ Install using pip:
 
 .. code-block:: none
 
-   pip install https://github.com/Cadair/matrix-appservice-hangouts
+   pip install git+https://github.com/Cadair/matrix-appservice-hangouts
 
 
 Requirements
