@@ -1,3 +1,4 @@
+import copy
 import os.path
 import asyncio
 import logging
@@ -40,7 +41,6 @@ class AppService:
         self.access_token = access_token
         self.server_name = server_domain
         self.hangouts_clients = {}
-        self.login_existing_clients()
 
         # Keep a list of valid matrix channels and be able to map room_id to alias.
         self.joined_conversations = bidict(self.cache['joined_conversations'])
@@ -57,6 +57,7 @@ class AppService:
         self.routes()
 
         self.loop.run_until_complete(self.register_user("hangouts"))
+        self.login_existing_clients()
 
     async def login_hangouts(self, mxid, refresh_token=None):
         if not refresh_token:
@@ -74,11 +75,31 @@ class AppService:
         self.hangouts_clients[mxid] = hangouts_client
 
     def login_existing_clients(self):
+        rooms_to_join = copy.deepcopy(self.joined_conversations)
         for mxid, cookies in self.cache['ho_tokens'].items():
             hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
             # TODO: run this async style
             self.loop.run_until_complete(hangouts_client.setup())
             self.hangouts_clients[mxid] = hangouts_client
+
+            log.debug("Join old Rooms")
+            log.debug(rooms_to_join)
+            joined_rooms = []
+            for ralias in rooms_to_join.keys():
+                log.debug(ralias)
+                conv_id = ralias[ralias.find("_")+1:ralias.find(':')]
+                log.debug(conv_id)
+                try:
+                    conv = hangouts_client.conversation_list.get(conv_id)
+                except KeyError:
+                    conv = None
+                if conv:
+                    conv.on_event.add_observer(hangouts_client.on_event)
+                    joined_rooms.append(ralias)
+            # Remove all the rooms this user is in
+            for ralias in joined_rooms:
+                rooms_to_join.pop(ralias)
+            log.debug(rooms_to_join)
 
     def setup_cache(self):
         if not self.cache_path or not os.path.isfile(self.cache_path):

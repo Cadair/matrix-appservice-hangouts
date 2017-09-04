@@ -1,6 +1,7 @@
 """
 Run the Application Service Hangouts <> Matrix bridge.
 """
+import os.path
 import asyncio
 import logging
 from tempfile import NamedTemporaryFile
@@ -23,7 +24,7 @@ logger.setLevel(logging.INFO)
 @click.argument('matrix_server', default="http://localhost:8008")
 @click.argument('server_domain', default="localhost")
 @click.argument('access_token', default="wfghWEGh3wgWHEf3478sHFWE")
-@click.argument('cache_path', default=False)
+@click.option('--cache_path', default="./.hangouts_cache.yml")
 @click.option('--debug/--no-debug', default=False)
 def main(matrix_server, server_domain,
          access_token, cache_path=None,
@@ -34,6 +35,8 @@ def main(matrix_server, server_domain,
 
     if not cache_path:
         cache_path = NamedTemporaryFile(delete=True).name
+    else:
+        cache_path = os.path.abspath(cache_path)
 
     loop = asyncio.get_event_loop()
 

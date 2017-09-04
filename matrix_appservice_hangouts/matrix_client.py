@@ -237,3 +237,21 @@ class MatrixClient:
             p.update(self._as_uid(user_id))
         resp  = await self._send("GET", "rooms/{}/members".format(quote(room_id)), params=p)
         return await resp.json()
+
+    async def get_room_members(self, room_id, user_id=None):
+        """Get the list of members for this room.
+        Args:
+            room_id (str): The room to get the member events for.
+        """
+        p = self._token_params()
+        if user_id:
+            p.update(self._as_uid(user_id))
+        resp  = await self._send("GET", "rooms/{}/members".format(quote(room_id)), params=p)
+        return await resp.json()
+
+    async def joined_rooms(self, user_id):
+        p = self._token_params()
+        if user_id:
+            p.update(self._as_uid(user_id))
+        resp  = await self._send("GET", "joined_rooms", params=p)
+        return await resp.json()
