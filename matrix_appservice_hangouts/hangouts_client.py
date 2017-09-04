@@ -99,7 +99,6 @@ class HangoutsClient:
             )
         )
         user = get_self_info_response.self_entity
-        log.debug(user)
         return hangups.user.User.from_entity(user, None)
 
     async def get_users_conversations(self):

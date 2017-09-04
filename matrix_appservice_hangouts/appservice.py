@@ -86,15 +86,12 @@ class AppService:
             await hangouts_client.setup()
             self.hangouts_clients[mxid] = hangouts_client
 
-            log.debug("Join old Rooms")
-            log.debug(rooms_to_join)
             joined_rooms = []
             for ralias in rooms_to_join.keys():
-                log.debug(ralias)
                 conv_id = ralias[ralias.find("_")+1:ralias.find(':')]
-                log.debug(conv_id)
                 try:
                     conv = hangouts_client.conversation_list.get(conv_id)
+                    # await self.add_hangouts_users_to_room(conv, ralias)
                 except KeyError:
                     conv = None
                 if conv:
@@ -103,18 +100,15 @@ class AppService:
             # Remove all the rooms this user is in
             for ralias in joined_rooms:
                 rooms_to_join.pop(ralias)
-            log.debug(rooms_to_join)
 
         for ralias in self.joined_conversations.keys():
             log.debug(f"getting self: {ralias}")
             self.hangouts_users_in_room[ralias] = []
             for mxid, hangouts_client in self.hangouts_clients.items():
-                log.debug(f"{mxid}: {hangouts_client}")
                 conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
 
                 if conv:
                     user = await hangouts_client.get_self()
-                    log.debug(f"{mxid}: {user.id_.gaia_id}")
                     self.hangouts_users_in_room[ralias].append(user.id_.gaia_id)
                 else:
                     log.error(f"Did not find {ralias} for {mxid}")
@@ -198,7 +192,9 @@ class AppService:
 
         # TODO: Set the flag for the room to be a direct chat if only one other
         # hangouts user is in the room.
+        await self.add_hangouts_users_to_room(conv, room_alias)
 
+    async def add_hangouts_users_to_room(self, conv, room_alias):
         # TODO: This loop needs to be thrown into the background,
         # the room can be joined without all the users in.
         # Register Users
@@ -371,13 +367,15 @@ Received Hangouts Event:
 """)
         room_alias = f"#hangouts_{conv.id_}:{self.server_name}"
         user_id = f"@hangouts_{user.id_.gaia_id}:{self.server_name}"
-        if room_alias in self.joined_conversations and event.user_id not in self.hangouts_users_in_room[room_alias]:
+        if (room_alias in self.joined_conversations and
+            event.user_id.gaia_id not in self.hangouts_users_in_room[room_alias]):
+
             resp = await self.matrix_client.send_message(room_alias,
                                                          event.text,
                                                          user_id=user_id)
             return resp
         else:
-            log.error("No Room found")
+            log.debug("Not forwarding this hangouts event")
 
     async def room_alias(self, request):
         alias = request.match_info["alias"]

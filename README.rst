@@ -74,11 +74,15 @@ with:
 You can then connect your matrix client to the address `http://localhost:8008`
 with the username `@admin:localhost` and password `admin`.
 
+TODO List
+---------
 
-Compatibility
--------------
+* Handle hangouts events:
+  - Join room
+  - Part room
+  - Typing
+  - Online / Offline (bidirectional)
 
-Python 3.6 only.
 
 Licence
 -------
