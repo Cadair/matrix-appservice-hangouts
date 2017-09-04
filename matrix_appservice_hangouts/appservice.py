@@ -113,13 +113,21 @@ class AppService:
         Given a hangouts conversation, perform joining operations.
         """
         log.debug(f"Joining Hangouts Conversation: {conversation_id}")
+
         # Join the hangouts conversation
         conv = self.hangouts_clients[mxid].get_conversation(conversation_id)
 
-        # Create the room based on conversation ID
         room_alias = f"#hangouts_{conv.id_}:{self.server_name}"
+
+        if room_alias in self.joined_conversations:
+            log.info("Room already created")
+            return
+
+        # Create the room based on conversation ID
         log.info(f"Creating room: {room_alias}")
         await self.matrix_client.create_room(room_alias)
+
+        conv.on_event.add_observer(self.hangouts_clients[mxid].on_event)
 
         room_id = await self.matrix_client.get_room_id(room_alias)
 
