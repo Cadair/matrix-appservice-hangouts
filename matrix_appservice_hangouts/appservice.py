@@ -64,14 +64,9 @@ class AppService:
         self.loop.run_until_complete(self.login_existing_clients())
 
     async def login_hangouts(self, mxid, refresh_token=None):
-        """
-        Login a given matrix user to hangouts.
-
-        Either using supplied token or cached one.
-        """
         if not refresh_token:
-            if mxid in self.cache['ho_tokens']:
-                refresh_token = self.cache['ho_tokens'][mxid]
+            if mxid in self.cache['ho_cookies']:
+                refresh_token = self.cache['ho_cookies'][mxid]
             else:
                 raise ValueError("Login Failed, cookies not in cache and no token provided.")
 
@@ -79,44 +74,51 @@ class AppService:
                                                                        self.recieve_hangouts_event,
                                                                        self.loop,
                                                                        self.client_session)
-        self.cache['ho_tokens'][mxid] = refresh_token
+        self.cache['ho_cookies'][mxid] = hangouts_client.cookies
 
         self.hangouts_clients[mxid] = hangouts_client
 
-        return hangouts_client
-
     async def login_existing_clients(self):
-        rooms_to_join = dict(copy.deepcopy(self.joined_conversations))
-        for mxid, refresh_token in self.cache['ho_tokens'].items():
+        rooms_to_join = copy.deepcopy(self.joined_conversations)
+        for mxid, cookies in self.cache['ho_cookies'].items():
+            hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
+            # TODO: run this async style
+            await hangouts_client.setup()
+            self.hangouts_clients[mxid] = hangouts_client
 
-            hangouts_client = await self.login_hangouts(mxid, refresh_token=refresh_token)
-
+            log.debug("Join old Rooms")
+            log.debug(rooms_to_join)
             joined_rooms = []
             for ralias in rooms_to_join.keys():
-                conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
+                log.debug(ralias)
+                conv_id = ralias[ralias.find("_")+1:ralias.find(':')]
+                log.debug(conv_id)
+                try:
+                    conv = hangouts_client.conversation_list.get(conv_id)
+                except KeyError:
+                    conv = None
                 if conv:
                     conv.on_event.add_observer(hangouts_client.on_event)
                     joined_rooms.append(ralias)
-                else:
-                    log.debug(f"not found {ralias}")
-
             # Remove all the rooms this user is in
             for ralias in joined_rooms:
-                log.debug(f"Joined hangouts client to room: {ralias}")
                 rooms_to_join.pop(ralias)
-
-        if rooms_to_join:
             log.debug(rooms_to_join)
-            raise Exception("Something terrible has happened, not all saved rooms have been joined.")
 
         for ralias in self.joined_conversations.keys():
             log.debug(f"getting self: {ralias}")
             self.hangouts_users_in_room[ralias] = []
             for mxid, hangouts_client in self.hangouts_clients.items():
+                log.debug(f"{mxid}: {hangouts_client}")
                 conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
+
                 if conv:
                     user = await hangouts_client.get_self()
+                    log.debug(f"{mxid}: {user.id_.gaia_id}")
                     self.hangouts_users_in_room[ralias].append(user.id_.gaia_id)
+                else:
+                    log.error(f"Did not find {ralias} for {mxid}")
+        log.debug(self.hangouts_users_in_room)
 
     def get_conv_id(self, ralias):
         """
@@ -131,8 +133,8 @@ class AppService:
             yaml = YAML()
             cache = yaml.load(open(self.cache_path, 'r'))
 
-        if 'ho_tokens' not in cache:
-            cache['ho_tokens'] = {}
+        if 'ho_cookies' not in cache:
+            cache['ho_cookies'] = {}
         if 'admin_channels' not in cache:
             cache['admin_channels'] = {}
         if 'joined_conversations' not in cache:

@@ -51,3 +51,6 @@
 
 - name: Add an admin user to Synapse
   command: register_new_matrix_user -c /etc/synapse/homeserver.yaml -u admin -p admin -a
+
+- name: Add an admin2 user to Synapse
+  command: register_new_matrix_user -c /etc/synapse/homeserver.yaml -u admin2 -p admin -a

@@ -59,6 +59,7 @@ class HangoutsClient:
         cookies = await cls.login(refresh_token, client_session)
         client = cls(cookies, recieve_event_handler, loop=loop)
         await client.setup()
+        await client.get_self()
         return client
 
     def __init__(self, cookies, recieve_event_handler, loop=None):
@@ -98,6 +99,7 @@ class HangoutsClient:
             )
         )
         user = get_self_info_response.self_entity
+        log.debug(user)
         return hangups.user.User.from_entity(user, None)
 
     async def get_users_conversations(self):
