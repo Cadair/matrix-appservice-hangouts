@@ -321,6 +321,8 @@ Received Matrix Transaction:
                 await self.login_hangouts(event['user_id'], refresh_token=refresh_token)
                 output = "Login Successful. Type 'list conversations' to see your conversation list."
             except Exception as e:
+                log.error("Authentication Failed:")
+                log.error(e, exc_info=True)
                 output = "Login failed with error: {}".format(str(e))
 
         if output:
