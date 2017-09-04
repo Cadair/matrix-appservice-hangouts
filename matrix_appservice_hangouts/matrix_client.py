@@ -122,9 +122,12 @@ class MatrixClient:
         if 'room_id' in json:
             return json['room_id']
 
-    async def join_room(self, room_alias, user_id=None):
+    async def join_room(self, room_alias, user_id=None, access_token=True):
         room_alias = quote(room_alias)
-        p = self._token_params()
+        if access_token:
+            p = self._token_params()
+        else:
+            p = {}
         if user_id:
             p.update(self._as_uid(user_id))
 

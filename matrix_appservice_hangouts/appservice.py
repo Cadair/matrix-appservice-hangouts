@@ -56,6 +56,8 @@ class AppService:
         self.app = web.Application(loop=self.loop)
         self.routes()
 
+        self.loop.run_until_complete(self.register_user("hangouts"))
+
     async def login_hangouts(self, mxid, refresh_token=None):
         if not refresh_token:
             if mxid in self.cache['ho_tokens']:
@@ -240,8 +242,8 @@ Received Matrix Transaction:
             # join another.
             user_id = event['user_id']
             if user_id not in self.admin_channels.keys():
-                self.admin_channels[user_id] = event['room_id']
                 resp = await self.matrix_client.join_room(event['room_id'])
+                self.admin_channels[user_id] = event['room_id']
             # TODO: test this code path.
             elif user_id not in self.admin_channels.keys() and self.admin_channels[user_id] != event['room_id']:
                 resp = await self.matrix_client.join_room(self.admin_channels[user_id])
