@@ -46,6 +46,9 @@ class AppService:
         self.joined_conversations = bidict(self.cache['joined_conversations'])
         # Keep a mapping of matrix users to admin channels
         self.admin_channels = self.cache['admin_channels']
+        # Keep a list of all the hangouts users in each matrix room to prevent
+        # echo
+        self.hangouts_users_in_room = {}
 
         # Event types mapped to methods
         self._matrix_event_dispatch = {}
@@ -56,10 +59,16 @@ class AppService:
         self.app = web.Application(loop=self.loop)
         self.routes()
 
+        # TODO: Schedule both of these for background execution.
         self.loop.run_until_complete(self.register_user("hangouts"))
-        self.login_existing_clients()
+        self.loop.run_until_complete(self.login_existing_clients())
 
     async def login_hangouts(self, mxid, refresh_token=None):
+        """
+        Login a given matrix user to hangouts.
+
+        Either using supplied token or cached one.
+        """
         if not refresh_token:
             if mxid in self.cache['ho_tokens']:
                 refresh_token = self.cache['ho_tokens'][mxid]
@@ -70,36 +79,50 @@ class AppService:
                                                                        self.recieve_hangouts_event,
                                                                        self.loop,
                                                                        self.client_session)
-        self.cache['ho_tokens'][mxid] = hangouts_client.cookies
+        self.cache['ho_tokens'][mxid] = refresh_token
 
         self.hangouts_clients[mxid] = hangouts_client
 
-    def login_existing_clients(self):
-        rooms_to_join = copy.deepcopy(self.joined_conversations)
-        for mxid, cookies in self.cache['ho_tokens'].items():
-            hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
-            # TODO: run this async style
-            self.loop.run_until_complete(hangouts_client.setup())
-            self.hangouts_clients[mxid] = hangouts_client
+        return hangouts_client
 
-            log.debug("Join old Rooms")
-            log.debug(rooms_to_join)
+    async def login_existing_clients(self):
+        rooms_to_join = dict(copy.deepcopy(self.joined_conversations))
+        for mxid, refresh_token in self.cache['ho_tokens'].items():
+
+            hangouts_client = await self.login_hangouts(mxid, refresh_token=refresh_token)
+
             joined_rooms = []
             for ralias in rooms_to_join.keys():
-                log.debug(ralias)
-                conv_id = ralias[ralias.find("_")+1:ralias.find(':')]
-                log.debug(conv_id)
-                try:
-                    conv = hangouts_client.conversation_list.get(conv_id)
-                except KeyError:
-                    conv = None
+                conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
                 if conv:
                     conv.on_event.add_observer(hangouts_client.on_event)
                     joined_rooms.append(ralias)
+                else:
+                    log.debug(f"not found {ralias}")
+
             # Remove all the rooms this user is in
             for ralias in joined_rooms:
+                log.debug(f"Joined hangouts client to room: {ralias}")
                 rooms_to_join.pop(ralias)
+
+        if rooms_to_join:
             log.debug(rooms_to_join)
+            raise Exception("Something terrible has happened, not all saved rooms have been joined.")
+
+        for ralias in self.joined_conversations.keys():
+            log.debug(f"getting self: {ralias}")
+            self.hangouts_users_in_room[ralias] = []
+            for mxid, hangouts_client in self.hangouts_clients.items():
+                conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
+                if conv:
+                    user = await hangouts_client.get_self()
+                    self.hangouts_users_in_room[ralias].append(user.id_.gaia_id)
+
+    def get_conv_id(self, ralias):
+        """
+        Given a matrix room alias get the hangouts conversation ID
+        """
+        return ralias[ralias.find("_")+1:ralias.find(':')]
 
     def setup_cache(self):
         if not self.cache_path or not os.path.isfile(self.cache_path):
@@ -168,6 +191,14 @@ class AppService:
                                                           name,
                                                           user_id=f"@hangouts:{self.server_name}")
 
+        # TODO: We need to set the room image as well, for 1-1 rooms it should be the
+        # avatar of the user.
+
+        # TODO: Set the flag for the room to be a direct chat if only one other
+        # hangouts user is in the room.
+
+        # TODO: This loop needs to be thrown into the background,
+        # the room can be joined without all the users in.
         # Register Users
         for user in conv.users:
             if not user.is_self:
@@ -245,9 +276,9 @@ Received Matrix Transaction:
         if "hangouts" not in event['user_id']:
             if event['room_id'] in self.joined_conversations.values():
                 ralias = self.joined_conversations.inv[event['room_id']]
-                conv_id = ralias[ralias.find("_")+1:ralias.find(':')]
+                conv_id = self.get_conv_id(ralias)
                 hangouts_client = self.hangouts_clients[event['user_id']]
-                conv = hangouts_client.conversation_list.get(conv_id)
+                conv = hangouts_client.get_conversation(conv_id)
                 resp = await hangouts_client.send_message(conv,
                                                           event['content']['body'])
                 return resp
@@ -338,7 +369,7 @@ Received Hangouts Event:
 """)
         room_alias = f"#hangouts_{conv.id_}:{self.server_name}"
         user_id = f"@hangouts_{user.id_.gaia_id}:{self.server_name}"
-        if room_alias in self.joined_conversations:
+        if room_alias in self.joined_conversations and event.user_id not in self.hangouts_users_in_room[room_alias]:
             resp = await self.matrix_client.send_message(room_alias,
                                                          event.text,
                                                          user_id=user_id)

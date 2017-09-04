@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import hangups
+from hangups import hangouts_pb2
 
 
 log = logging.getLogger("hangouts_as")
@@ -89,6 +90,16 @@ class HangoutsClient:
     async def close(self):
         await self.client.disconnect()
 
+    async def get_self(self):
+        # Retrieve self entity.
+        get_self_info_response = await self.client.get_self_info(
+            hangouts_pb2.GetSelfInfoRequest(
+                request_header=self.client.get_request_header(),
+            )
+        )
+        user = get_self_info_response.self_entity
+        return hangups.user.User.from_entity(user, None)
+
     async def get_users_conversations(self):
         """
         Get a list of all users and conversations
@@ -104,7 +115,11 @@ class HangoutsClient:
         """
         Return a Conversation object from the list.
         """
-        return self.conversation_list.get(conversation_id)
+        try:
+            return self.conversation_list.get(conversation_id)
+        except KeyError as e:
+            log.debug(e, exc_info=True)
+            return
 
     async def send_message(self, conversation, message):
         """
@@ -120,5 +135,4 @@ class HangoutsClient:
         """
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
-        if not user.is_self:
-            await self.recieve_event_handler(conv, user, conv_event)
+        await self.recieve_event_handler(conv, user, conv_event)
