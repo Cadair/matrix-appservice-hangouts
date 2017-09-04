@@ -46,8 +46,10 @@ def main(matrix_server, server_domain,
                       cache_path=cache_path,
                       loop=loop)
 
-    # Do some setup
-    web.run_app(apps.app, host='127.0.0.1', port=5000)
+    try:
+        # Do some setup
+        web.run_app(apps.app, host='127.0.0.1', port=5000)
+        apps.client_session.close()
 
-    apps.client_session.close()
-    apps.save_cache()
+    finally:
+        apps.save_cache()
