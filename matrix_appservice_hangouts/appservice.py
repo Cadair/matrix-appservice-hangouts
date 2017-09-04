@@ -168,6 +168,8 @@ class AppService:
         await self.matrix_client.create_room(room_alias)
 
         conv.on_event.add_observer(self.hangouts_clients[mxid].on_event)
+        user = await self.hangouts_clients[mxid].get_self()
+        self.hangouts_users_in_room[room_alias].append(user.id_.gaia_id)
 
         room_id = await self.matrix_client.get_room_id(room_alias)
 
