@@ -130,10 +130,13 @@ class HangoutsClient:
         cms = hangups.ChatMessageSegment.from_str(message)
         await conversation.send_message(cms)
 
-    async def on_event(self, conv_event):
+    async def on_message(self, conv_event):
         """
         Recieve an event.
         """
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
         await self.recieve_event_handler(conv, user, conv_event)
+
+    async def on_event(self, conv_event):
+        log.debug(f"{conv_event}, {type(conv_event)}")

@@ -63,57 +63,6 @@ class AppService:
         self.loop.run_until_complete(self.register_user("hangouts"))
         self.loop.run_until_complete(self.login_existing_clients())
 
-    async def login_hangouts(self, mxid, refresh_token=None):
-        if not refresh_token:
-            if mxid in self.cache['ho_cookies']:
-                refresh_token = self.cache['ho_cookies'][mxid]
-            else:
-                raise ValueError("Login Failed, cookies not in cache and no token provided.")
-
-        hangouts_client = await HangoutsClient.init_from_refresh_token(refresh_token,
-                                                                       self.recieve_hangouts_event,
-                                                                       self.loop,
-                                                                       self.client_session)
-        self.cache['ho_cookies'][mxid] = hangouts_client.cookies
-
-        self.hangouts_clients[mxid] = hangouts_client
-
-    async def login_existing_clients(self):
-        rooms_to_join = copy.deepcopy(self.joined_conversations)
-        for mxid, cookies in self.cache['ho_cookies'].items():
-            hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
-            # TODO: run this async style
-            await hangouts_client.setup()
-            self.hangouts_clients[mxid] = hangouts_client
-
-            joined_rooms = []
-            for ralias in rooms_to_join.keys():
-                conv_id = ralias[ralias.find("_")+1:ralias.find(':')]
-                try:
-                    conv = hangouts_client.conversation_list.get(conv_id)
-                    # await self.add_hangouts_users_to_room(conv, ralias)
-                except KeyError:
-                    conv = None
-                if conv:
-                    conv.on_event.add_observer(hangouts_client.on_event)
-                    joined_rooms.append(ralias)
-            # Remove all the rooms this user is in
-            for ralias in joined_rooms:
-                rooms_to_join.pop(ralias)
-
-        for ralias in self.joined_conversations.keys():
-            log.debug(f"getting self: {ralias}")
-            self.hangouts_users_in_room[ralias] = []
-            for mxid, hangouts_client in self.hangouts_clients.items():
-                conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
-
-                if conv:
-                    user = await hangouts_client.get_self()
-                    self.hangouts_users_in_room[ralias].append(user.id_.gaia_id)
-                else:
-                    log.error(f"Did not find {ralias} for {mxid}")
-        log.debug(self.hangouts_users_in_room)
-
     def get_conv_id(self, ralias):
         """
         Given a matrix room alias get the hangouts conversation ID
@@ -148,6 +97,52 @@ class AppService:
         self.app.router.add_route('GET', "/rooms/{alias}", self.room_alias)
         self.app.router.add_route('GET', "/users/{userid}", self.query_userid)
 
+    async def login_hangouts_token(self, mxid, refresh_token):
+        """
+        Login to hangouts with a refresh_token
+        """
+        hangouts_client = await HangoutsClient.init_from_refresh_token(refresh_token,
+                                                                       self.recieve_hangouts_event,
+                                                                       self.loop,
+                                                                       self.client_session)
+        self.cache['ho_cookies'][mxid] = hangouts_client.cookies
+
+        self.hangouts_clients[mxid] = hangouts_client
+
+    async def login_existing_clients(self):
+        """
+        On startup, connect to all cached rooms.
+        """
+        rooms_to_join = copy.deepcopy(self.joined_conversations)
+        for mxid, cookies in self.cache['ho_cookies'].items():
+            hangouts_client = HangoutsClient(cookies, self.recieve_hangouts_event)
+            await hangouts_client.setup()
+            self.hangouts_clients[mxid] = hangouts_client
+
+            joined_rooms = []
+            for ralias in rooms_to_join.keys():
+                conv_id = self.get_conv_id(ralias)
+                conv = hangouts_client.get_conversation(conv_id)
+                if conv:
+                    conv.on_event.add_observer(hangouts_client.on_message)
+                    joined_rooms.append(ralias)
+
+            # Remove all the rooms this user is in
+            for ralias in joined_rooms:
+                rooms_to_join.pop(ralias)
+
+        for ralias in self.joined_conversations.keys():
+            log.debug(f"Getting self: {ralias}")
+            self.hangouts_users_in_room[ralias] = []
+            for mxid, hangouts_client in self.hangouts_clients.items():
+                conv = hangouts_client.get_conversation(self.get_conv_id(ralias))
+
+                if conv:
+                    user = await hangouts_client.get_self()
+                    self.hangouts_users_in_room[ralias].append(user.id_.gaia_id)
+                else:
+                    log.error(f"Did not find {ralias} for {mxid}")
+
     async def join_hangouts_conversation(self, mxid, conversation_id):
         """
         Given a hangouts conversation, perform joining operations.
@@ -167,7 +162,7 @@ class AppService:
         log.info(f"Creating room: {room_alias}")
         await self.matrix_client.create_room(room_alias)
 
-        conv.on_event.add_observer(self.hangouts_clients[mxid].on_event)
+        conv.on_event.add_observer(self.hangouts_clients[mxid].on_message)
         user = await self.hangouts_clients[mxid].get_self()
         self.hangouts_users_in_room[room_alias].append(user.id_.gaia_id)
 
@@ -194,12 +189,16 @@ class AppService:
 
         # TODO: Set the flag for the room to be a direct chat if only one other
         # hangouts user is in the room.
-        await self.add_hangouts_users_to_room(conv, room_alias)
 
-    async def add_hangouts_users_to_room(self, conv, room_alias):
         # TODO: This loop needs to be thrown into the background,
         # the room can be joined without all the users in.
         # Register Users
+        await self.add_hangouts_users_to_room(conv, room_alias)
+
+    async def add_hangouts_users_to_room(self, conv, room_alias):
+        """
+        For each user in the conversation, create a corresponding matrix user.
+        """
         for user in conv.users:
             if not user.is_self:
                 user_id = f"hangouts_{user.id_.gaia_id}"
@@ -349,7 +348,7 @@ Received Matrix Transaction:
             token = message.split("token:")[1]
             refresh_token = token.strip()
             try:
-                await self.login_hangouts(event['user_id'], refresh_token=refresh_token)
+                await self.login_hangouts_token(event['user_id'], refresh_token=refresh_token)
                 output = "Login Successful. Type 'list conversations' to see your conversation list."
             except Exception as e:
                 log.error("Authentication Failed:")

@@ -35,9 +35,9 @@ this command connect to the localhost testing homeserver.
 
   $ hangoutsas --help
   Usage: hangoutsas [OPTIONS] [MATRIX_SERVER] [SERVER_DOMAIN] [ACCESS_TOKEN]
-                    [CACHE_PATH]
 
   Options:
+    --cache_path TEXT
     --debug / --no-debug
     --help                Show this message and exit.
 
