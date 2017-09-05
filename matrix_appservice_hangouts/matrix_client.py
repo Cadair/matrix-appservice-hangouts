@@ -4,7 +4,6 @@ from urllib.parse import urljoin, quote
 
 
 log = logging.getLogger("hangouts_as")
-BASE_URL = "http://localhost:8008"
 
 
 class MatrixClient:
@@ -21,7 +20,7 @@ class MatrixClient:
 
     def _get_url(self, endpoint, api_endpoint):
         end = urljoin(api_endpoint, endpoint)
-        target = urljoin(BASE_URL, end)
+        target = urljoin(self.base_url, end)
         return target
 
     def _jsonify(self, adict):
