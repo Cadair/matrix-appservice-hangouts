@@ -124,7 +124,7 @@ class AppService:
                 conv_id = self.get_conv_id(ralias)
                 conv = hangouts_client.get_conversation(conv_id)
                 if conv:
-                    conv.on_event.add_observer(hangouts_client.on_message)
+                    conv.on_event.add_observer(hangouts_client.on_event)
                     joined_rooms.append(ralias)
 
             # Remove all the rooms this user is in
@@ -162,7 +162,7 @@ class AppService:
         log.info(f"Creating room: {room_alias}")
         await self.matrix_client.create_room(room_alias)
 
-        conv.on_event.add_observer(self.hangouts_clients[mxid].on_message)
+        conv.on_event.add_observer(self.hangouts_clients[mxid].on_event)
         user = await self.hangouts_clients[mxid].get_self()
         self.hangouts_users_in_room[room_alias].append(user.id_.gaia_id)
 
