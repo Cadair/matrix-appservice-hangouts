@@ -77,6 +77,8 @@ with the username `@admin:localhost` and password `admin`.
 TODO List
 ---------
 
+* Handle invites to rooms when messages are recived. (This need a proper hangouts event handler).
+
 * Handle hangouts events:
   - Join room
   - Part room
