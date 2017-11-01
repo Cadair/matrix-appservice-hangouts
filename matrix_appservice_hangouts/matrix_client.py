@@ -136,6 +136,21 @@ class MatrixClient:
                                 params=p)
         return resp
 
+    async def leave_room(self, room_id, user_id=None, access_token=True):
+        room_id = quote(room_id)
+        if access_token:
+            p = self._token_params()
+        else:
+            p = {}
+        if user_id:
+            p.update(self._as_uid(user_id))
+
+
+        resp = await self._send("POST", f"rooms/{room_id}/leave",
+                                api_path=self.room_endpoint,
+                                params=p)
+        return resp
+
     async def create_room(self, alias_name, invitees=None):
         """
         """
