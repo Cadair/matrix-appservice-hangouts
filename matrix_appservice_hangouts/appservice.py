@@ -263,7 +263,7 @@ Received Matrix Transaction:
                     await meth(event)
                 except Exception as e:
                     log.error(str(e))
-                    return web.Response(staus=500)
+                    return web.Response(status=500)
 
         return web.Response(body=b"{}")
 
@@ -296,7 +296,7 @@ Received Matrix Transaction:
         """
         log.debug("m.room.member")
         content = event['content']
-        if content['membership'] == "invite" and content['is_direct']:
+        if content['membership'] == "invite" and content.get('is_direct'):
             # If we already have an active admin channel with this user, don't
             # join another.
             user_id = event['user_id']
