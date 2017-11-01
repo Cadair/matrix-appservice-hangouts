@@ -263,7 +263,7 @@ Received Matrix Transaction:
                     await meth(event)
                 except Exception as e:
                     log.error(str(e))
-                    return web.Response(staus=500)
+                    return web.Response(status=500)
 
         return web.Response(body=b"{}")
 
