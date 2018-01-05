@@ -299,19 +299,14 @@ Received Matrix Transaction:
         log.debug("m.room.member")
         content = event['content']
         if content['membership'] == "invite" and content.get('is_direct'):
-            # If we already have an active admin channel with this user, don't
-            # join another.
             user_id = event['user_id']
-            if user_id not in self.admin_channels.keys():
-                resp = await self.matrix_client.join_room(event['room_id'])
-                self.admin_channels[user_id] = event['room_id']
-            # TODO: test this code path.
-            elif user_id not in self.admin_channels.keys() and self.admin_channels[user_id] != event['room_id']:
-                resp = await self.matrix_client.join_room(self.admin_channels[user_id])
-                resp = await self.matrix_client.invite_user(self.admin_channels[user_id], user_id)
-            else:
-                resp = await self.matrix_client.send_message(self.admin_channels[user_id], "Hello")
+            if user_id in self.admin_channels.keys():
+                room_id = self.admin_channels[user_id]
+                await self.matrix_client.leave_room(room_id)
 
+            await self.matrix_client.join_room(event['room_id'])
+            self.admin_channels[user_id] = event['room_id']
+            resp = await self.matrix_client.send_message(self.admin_channels[user_id], "Hello")
             return resp
 
     async def handle_admin_message(self, event):

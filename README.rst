@@ -41,6 +41,10 @@ this command connect to the localhost testing homeserver.
     --debug / --no-debug
     --help                Show this message and exit.
 
+Then start a direct chat with the user `@hangouts:domain.tld`, and use the command `login` and follows the instructions.
+
+If you encounter any difficulties to login, you can manually log in hangups using the `following instructions <https://github.com/tdryer/hangups/issues/350#issuecomment-323553771>`_. When logged in, you can find the refresh token in `~/.cache/hangups/refresh_token.txt` and use it to log in with the bridge.
+
 Installation
 ------------
 
