@@ -86,7 +86,7 @@ class HangoutsClient:
         )
         await asyncio.gather(*done)
         await asyncio.ensure_future(self.get_users_conversations())
-        # self.conversation_list.on_event.add_observer(self.on_event)
+        self.conversation_list.on_event.add_observer(self.on_event)
 
     async def close(self):
         await self.client.disconnect()
@@ -137,4 +137,4 @@ class HangoutsClient:
         log.debug(f"{conv_event}, {type(conv_event)}")
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
-        await self.recieve_event_handler(conv, user, conv_event)
+        await self.recieve_event_handler(self, conv, user, conv_event)
