@@ -170,6 +170,7 @@ class AppService:
 
         # Add this conversation to the list
         self.joined_conversations[room_alias] = room_id
+        log.debug(self.joined_conversations)
 
         # Set the conversation name
         name = None
@@ -179,6 +180,7 @@ class AppService:
             for user in conv.users:
                 if not user.is_self:
                     name = user.full_name
+        log.debug(name)
         if name:
             resp = await self.matrix_client.set_room_name(room_alias,
                                                           name,
