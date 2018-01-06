@@ -1,6 +1,7 @@
 """
 Run the Application Service Hangouts <> Matrix bridge.
 """
+import io
 import os.path
 import asyncio
 import logging
@@ -9,6 +10,7 @@ from tempfile import NamedTemporaryFile
 
 import click
 from aiohttp import web
+from hangups.hangouts_pb2 import ITEM_TYPE_PLUS_PHOTO
 
 from appservice_framework import AppService, database as db
 
@@ -33,18 +35,29 @@ async def create_new_user(apps, client, hangouts_user):
         user = await apps.create_matrix_user(user_id,
                                              nick=hangouts_user.full_name)
 
-        await apps.set_matrix_profile_image(user.matrixid, hangouts_user.photo_url)
+        await apps.set_matrix_profile_image(user.matrixid, "https:"+hangouts_user.photo_url)
 
     return user
 
 
 async def create_new_room(apps, client, auth_user, service_roomid):
-    room = await apps.create_linked_room(auth_user, service_roomid)
     conv = client.get_conversation(service_roomid)
+    # Set the conversation name
+    convname = None
+    if conv.name:
+        convname = conv.name
+    elif len(conv.users) == 2:
+        for user in conv.users:
+            if not user.is_self:
+                convname = user.full_name
+    log.debug(convname)
+
+    room = await apps.create_linked_room(auth_user, service_roomid,
+                                         matrix_roomname=convname)
 
     for user in conv.users:
+        log.debug("Creating user %s", user)
         if not user.is_self:
-
             user = await create_new_user(apps, client, user)
 
             if not user in room.users:
@@ -53,13 +66,31 @@ async def create_new_room(apps, client, auth_user, service_roomid):
     return room
 
 
+async def handle_message_with_attachments(apps, event, service_userid, service_roomid, self_id):
+    attachments_pb = event._event.chat_message.message_content.attachment
+
+    if len(event.attachments) > 1:
+        log.warning("Can't handle more that one attachment")
+    attachment = event.attachments[0]
+    attachment_pb = attachments_pb[0]
+
+    embed_item = attachment_pb.embed_item
+
+    if embed_item.type[0] == ITEM_TYPE_PLUS_PHOTO:
+        return await apps.relay_service_image(service_userid, service_roomid,
+                                              attachment, self_id)
+    else:
+        return await apps.relay_service_message(service_userid, service_roomid,
+                                                event.text, self_id)
+
+
 async def handle_hangouts_message(apps, client, conv, user, event):
+    log.debug("Received message in hangouts room: %s from user %s",
+              conv.id_, user.id_.gaia_id)
+
     service_roomid = conv.id_
     service_userid = str(user.id_.gaia_id)
     message = event.text
-
-    log.debug("Received message in hangouts room: %s from user %s",
-              service_roomid, service_userid)
 
     self_id = await client.get_self()
     self_id = str(self_id.id_.gaia_id)
@@ -75,8 +106,15 @@ async def handle_hangouts_message(apps, client, conv, user, event):
     if not room:
         room = await create_new_room(apps, client, auth_user, service_roomid)
 
-    await apps.relay_service_message(service_userid, service_roomid,
-                                     message, self_id)
+    try:
+        if event.attachments:
+            return await handle_message_with_attachments(apps, event, service_userid,
+                                                         service_roomid, self_id)
+    except Exception as e:
+        log.exception("Failed to handle message attachments")
+
+    return await apps.relay_service_message(service_userid, service_roomid,
+                                            message, self_id)
 
 
 @click.command()
@@ -114,6 +152,18 @@ def main(matrix_server, server_domain,
         return resp
 
 
+    @apps.matrix_recieve_image
+    async def send_message(apps, auth_user, room, content):
+        client, serviceid = await apps.service_connections[auth_user]
+        conv = client.get_conversation(room.serviceid)
+
+        # Get download URL from the matrix media store
+        image_url = content['url']
+        image_url = apps.api.get_download_url(image_url)
+
+        resp = await client.send_image(conv, image_url, content['body'])
+        return resp
+
 
     @apps.service_connect
     async def connect_hangouts(apps, userid, auth_token):
@@ -124,8 +174,8 @@ def main(matrix_server, server_domain,
 
         user = await client.get_self()
 
-
         return client, str(user.id_.gaia_id)
+
 
     user1 = apps.add_authenticated_user("@admin:localhost", hangouts_token)
 
