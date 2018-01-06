@@ -21,7 +21,7 @@ loop = asyncio.get_event_loop()
 # Logging
 log = logging.getLogger("hangouts_appservice")
 handler = logging.StreamHandler()
-formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+formatter = logging.Formatter('%(asctime)s %(name)-20s %(levelname)-8s %(message)s')
 handler.setFormatter(formatter)
 log.addHandler(handler)
 log.setLevel(logging.INFO)
