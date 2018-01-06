@@ -76,9 +76,13 @@ async def handle_message_with_attachments(apps, event, service_userid, service_r
 
     embed_item = attachment_pb.embed_item
 
+    # Get the filename from the headers
+    async with apps.http_session.request("GET", attachment) as resp:
+        filename = resp.headers['Content-Disposition'].split('"')[-2]
+
     if embed_item.type[0] == ITEM_TYPE_PLUS_PHOTO:
         return await apps.relay_service_image(service_userid, service_roomid,
-                                              attachment, self_id)
+                                              attachment, self_id, filename=filename)
     else:
         return await apps.relay_service_message(service_userid, service_roomid,
                                                 event.text, self_id)
