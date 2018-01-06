@@ -47,8 +47,9 @@ Installation
 
 **NOTE**: Currently the `appservice_framework` package requires a branch of the
  `matrix-python-sdk` so it's probably better if you clone both this repo and the
- [appservice-framework](https://github.com/Cadair/python-appservice-framework.git)
- repo and install using `requirements.txt` in both.
+ `appservice-framework
+ <https://github.com/Cadair/python-appservice-framework.git>`_ repo and install
+ using `requirements.txt` in both.
 
 ..
    Install using pip:
