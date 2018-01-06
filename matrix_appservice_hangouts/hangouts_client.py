@@ -1,3 +1,4 @@
+import io
 import asyncio
 import logging
 
@@ -57,18 +58,19 @@ class HangoutsClient:
         Login and make a thing
         """
         cookies = await cls.login(refresh_token, client_session)
-        client = cls(cookies, recieve_event_handler, loop=loop)
+        client = cls(cookies, recieve_event_handler, loop=loop, client_session=client_session)
         await client.setup()
         await client.get_self()
         return client
 
-    def __init__(self, cookies, recieve_event_handler, loop=None):
+    def __init__(self, cookies, recieve_event_handler, loop=None, client_session=None):
         if not loop:
             loop = asyncio.get_event_loop()
         self.loop = loop
 
         self.cookies = cookies
         self.client = hangups.Client(cookies)
+        self.http_session = client_session
 
         self.recieve_event_handler = recieve_event_handler
 
@@ -86,7 +88,7 @@ class HangoutsClient:
         )
         await asyncio.gather(*done)
         await asyncio.ensure_future(self.get_users_conversations())
-        # self.conversation_list.on_event.add_observer(self.on_event)
+        self.conversation_list.on_event.add_observer(self.on_event)
 
     async def close(self):
         await self.client.disconnect()
@@ -130,6 +132,15 @@ class HangoutsClient:
         cms = hangups.ChatMessageSegment.from_str(message)
         await conversation.send_message(cms)
 
+    async def send_image(self, conversation, image_url, filename):
+        async with self.http_session.request("GET", image_url) as resp:
+            data = await resp.read()
+
+        image_data = io.BytesIO(data)
+        image_id = await self.client.upload_image(image_data, filename=filename)
+        return await conversation.send_message([], image_id=image_id)
+
+
     async def on_event(self, conv_event):
         """
         Recieve an event.
@@ -137,4 +148,4 @@ class HangoutsClient:
         log.debug(f"{conv_event}, {type(conv_event)}")
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
-        await self.recieve_event_handler(conv, user, conv_event)
+        await self.recieve_event_handler(self, conv, user, conv_event)

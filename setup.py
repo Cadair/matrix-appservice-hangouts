@@ -15,9 +15,8 @@ setuptools.setup(
 
     install_requires=['aiohttp',
                       'hangups',
-                      'ruamel.yaml',
-                      'bidict',
-                      'click'],
+                      'click',
+                      'appservice_framework'],
 
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
