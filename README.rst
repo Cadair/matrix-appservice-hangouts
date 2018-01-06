@@ -38,7 +38,7 @@ this command connect to the localhost testing homeserver.
       --debug / --no-debug
       --help                Show this message and exit.
 
-You need to provide the matrix user id and hangouts authentication tokens for any users. This may change in the future, but it is very hard to obtain hangouts tokens and there are security concerns over storing all the user tokens.
+You need to provide the matrix user id and hangouts authentication tokens for any users (technically only on first run, as they are then stored in the database). This may change in the future, but it is very hard to obtain hangouts tokens and there are security concerns over allowing people to login with the bridge. (Also I haven't implemented support for an admin chat channel yet!)
 
 The best way to get your personal login token is to `follow these instructions <https://github.com/tdryer/hangups/issues/350#issuecomment-323553771>`_. When logged in, you can find the refresh token in `~/.cache/hangups/refresh_token.txt` and use it to log in with the bridge.
 
