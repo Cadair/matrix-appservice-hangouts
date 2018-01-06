@@ -1,16 +1,17 @@
 # vim:ft=yaml
+# Cadair
 # PEM encoded X509 certificate for TLS.
 # You can replace the self-signed certificate that synapse
 # autogenerates on launch with your own SSL certificate + key pair
 # if you like.  Any required intermediary certificates can be
 # appended after the primary certificate in hierarchical order.
-tls_certificate_path: "/etc/synapse/localhost.tls.crt"
+tls_certificate_path: "/etc/matrix-synapse/localhost.tls.crt"
 
 # PEM encoded private key for TLS
-tls_private_key_path: "/etc/synapse/localhost.tls.key"
+tls_private_key_path: "/etc/matrix-synapse/localhost.tls.key"
 
 # PEM dh parameters for ephemeral keys
-tls_dh_params_path: "/etc/synapse/localhost.tls.dh"
+tls_dh_params_path: "/etc/matrix-synapse/localhost.tls.dh"
 
 # Don't bind to the https port
 no_tls: False
@@ -47,7 +48,7 @@ tls_fingerprints: []
 server_name: "localhost"
 
 # When running as a daemon, the file to store the pid in
-pid_file: /etc/synapse/homeserver.pid
+pid_file: /etc/matrix-synapse/homeserver.pid
 
 # Whether to serve a web client from the HTTP/HTTPS root resource.
 web_client: False
@@ -130,7 +131,7 @@ database:
   # Arguments to pass to the engine
   args:
     # Path to the database
-    database: "/etc/synapse/homeserver.db"
+    database: "/etc/matrix-synapse/homeserver.db"
 
 # Number of events to cache in memory.
 event_cache_size: "10K"
@@ -141,10 +142,10 @@ event_cache_size: "10K"
 verbose: 0
 
 # File to write logging to
-log_file: "/etc/synapse/homeserver.log"
+log_file: "/etc/matrix-synapse/homeserver.log"
 
 # A yaml python logging config file
-log_config: "/etc/synapse/localhost.log.config"
+log_config: "/etc/matrix-synapse/localhost.log.config"
 
 # Stop twisted from discarding the stack traces of exceptions in
 # deferreds by waiting a reactor tick before running a deferred's
@@ -182,10 +183,10 @@ federation_rc_concurrent: 3
 
 
 # Directory where uploaded images and attachments are stored.
-media_store_path: "/etc/synapse/media_store"
+media_store_path: "/etc/matrix-synapse/media_store"
 
 # Directory where in-progress uploads are stored.
-uploads_path: "/etc/synapse/uploads"
+uploads_path: "/etc/matrix-synapse/uploads"
 
 # The largest allowed upload size in bytes
 max_upload_size: "10M"
@@ -376,7 +377,7 @@ expire_access_token: False
 ## Signing Keys ##
 
 # Path to the signing key to sign messages with
-signing_key_path: "/etc/synapse/localhost.signing.key"
+signing_key_path: "/etc/matrix-synapse/localhost.signing.key"
 
 # The keys that the server used to sign messages with but won't use
 # to sign new messages. E.g. it has lost its private key

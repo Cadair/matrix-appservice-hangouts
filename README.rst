@@ -1,14 +1,6 @@
 matrix-appservice-hangouts
 ==========================
 
-.. image:: https://img.shields.io/pypi/v/matrix-appservice-hangouts.svg
-    :target: https://pypi.python.org/pypi/matrix-appservice-hangouts
-    :alt: Latest PyPI version
-
-.. image:: https://travis-ci.org/borntyping/cookiecutter-pypackage-minimal.png
-   :target: https://travis-ci.org/borntyping/cookiecutter-pypackage-minimal
-   :alt: Latest Travis CI build status
-
 This is a `matrix appservice <https://matrix.org/docs/guides/application_services.html>`_
 with the objective of being a fully featured puppeting multi-user hangouts bridge.
 
@@ -34,25 +26,37 @@ this command connect to the localhost testing homeserver.
 .. code-block:: none
 
   $ hangoutsas --help
-  Usage: hangoutsas [OPTIONS] [MATRIX_SERVER] [SERVER_DOMAIN] [ACCESS_TOKEN]
+    Usage: hangoutsas [OPTIONS]
 
-  Options:
-    --cache_path TEXT
-    --debug / --no-debug
-    --help                Show this message and exit.
+    Options:
+      -m, --mxid TEXT
+      -t, --token TEXT
+      --matrix_server TEXT
+      --server_domain TEXT
+      --database-uri TEXT
+      --access_token TEXT
+      --debug / --no-debug
+      --help                Show this message and exit.
 
-Then start a direct chat with the user `@hangouts:domain.tld`, and use the command `login` and follows the instructions.
+You need to provide the matrix user id and hangouts authentication tokens for any users. This may change in the future, but it is very hard to obtain hangouts tokens and there are security concerns over storing all the user tokens.
 
-If you encounter any difficulties to login, you can manually log in hangups using the `following instructions <https://github.com/tdryer/hangups/issues/350#issuecomment-323553771>`_. When logged in, you can find the refresh token in `~/.cache/hangups/refresh_token.txt` and use it to log in with the bridge.
+The best way to get your personal login token is to `follow these instructions <https://github.com/tdryer/hangups/issues/350#issuecomment-323553771>`_. When logged in, you can find the refresh token in `~/.cache/hangups/refresh_token.txt` and use it to log in with the bridge.
 
 Installation
 ------------
 
-Install using pip:
+**NOTE**: Currently the `appservice_framework` package requires a branch of the
+ `matrix-python-sdk` so it's probably better if you clone both this repo and the
+ [appservice-framework](https://github.com/Cadair/python-appservice-framework.git)
+ repo and install using `requirements.txt` in both.
 
-.. code-block:: none
+..
+   Install using pip:
 
-   pip install git+https://github.com/Cadair/matrix-appservice-hangouts
+   .. code-block:: none
+
+      pip install git+https://github.com/Cadair/python-appservice-framework.git
+      pip install git+https://github.com/Cadair/matrix-appservice-hangouts
 
 
 Requirements
@@ -60,8 +64,8 @@ Requirements
 
 * aiohttp
 * hangups
-* ruamel.yaml
-* bidict
+* click
+* https://github.com/Cadair/python-appservice-framework.git
 
 
 Testing and Development
@@ -81,13 +85,13 @@ with the username `@admin:localhost` and password `admin`.
 TODO List
 ---------
 
-* Handle invites to rooms when messages are recived. (This need a proper hangouts event handler).
-
 * Handle hangouts events:
   - Join room
   - Part room
   - Typing
   - Online / Offline (bidirectional)
+
+* Add some way of joining hangouts rooms before getting a message in the room. This might be made easier once communities are easily filterable on the matrix side.
 
 
 Licence

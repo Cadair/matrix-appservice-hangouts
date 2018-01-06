@@ -9,6 +9,7 @@ from functools import partial
 from tempfile import NamedTemporaryFile
 
 import click
+import aiohttp
 from aiohttp import web
 from hangups.hangouts_pb2 import ITEM_TYPE_PLUS_PHOTO
 
@@ -50,7 +51,6 @@ async def create_new_room(apps, client, auth_user, service_roomid):
         for user in conv.users:
             if not user.is_self:
                 convname = user.full_name
-    log.debug(convname)
 
     room = await apps.create_linked_room(auth_user, service_roomid,
                                          matrix_roomname=convname)
@@ -122,20 +122,24 @@ async def handle_hangouts_message(apps, client, conv, user, event):
 
 
 @click.command()
-@click.argument("hangouts_token")
-@click.argument('matrix_server', default="http://localhost:8008")
-@click.argument('server_domain', default="localhost")
-@click.argument('database_uri', default="sqlite:///:memory:")
-@click.argument('access_token', default="wfghWEGh3wgWHEf3478sHFWE")
+@click.option("--mxid", "-m", multiple=True)
+@click.option("--token", "-t", multiple=True)
+@click.option('--matrix_server', default="http://localhost:8008")
+@click.option('--server_domain', default="localhost")
+@click.option('--database-uri', default="sqlite:///:memory:")
+@click.option('--access_token', default="wfghWEGh3wgWHEf3478sHFWE")
 @click.option('--debug/--no-debug', default=True)
-def main(matrix_server, server_domain,
+def main(mxid, token, matrix_server, server_domain,
          access_token, database_uri,
-         hangouts_token,
          debug=False):
 
     if debug:
         log.setLevel(logging.DEBUG)
 
+    if not len(mxid) == len(token):
+        raise ValueError("you must specify equal numbers of tokens and mxids")
+    if not mxid and token:
+        raise ValueError("You must specify at least one mxid, token pair")
 
     apps = AppService(matrix_server=matrix_server,
                       server_domain=server_domain,
@@ -171,17 +175,24 @@ def main(matrix_server, server_domain,
 
     @apps.service_connect
     async def connect_hangouts(apps, userid, auth_token):
-        client = await HangoutsClient.init_from_refresh_token(auth_token,
-                                                              partial(handle_hangouts_message, apps),
-                                                              loop,
-                                                              apps.http_session)
+        # Each auth needs it's own session.
+        async with aiohttp.ClientSession() as session:
+            client = await HangoutsClient.init_from_refresh_token(auth_token,
+                                                                  partial(handle_hangouts_message, apps),
+                                                                  loop=loop,
+                                                                  client_session=session)
 
+        # Once we have authed we want to use the open session
+        client.http_session = apps.http_session
         user = await client.get_self()
+        serviceid = str(user.id_.gaia_id)
 
-        return client, str(user.id_.gaia_id)
+        return client, serviceid
 
 
-    user1 = apps.add_authenticated_user("@admin:localhost", hangouts_token)
+    for mxid, token in zip(mxid, token):
+        if not apps.get_user(matrixid=mxid):
+            apps.add_authenticated_user(mxid, token)
 
 
     with apps.run() as run_forever:

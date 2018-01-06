@@ -1,0 +1,4 @@
+aiohttp
+hangups
+click
+git+https://github.com/Cadair/python-appservice-framework.git
