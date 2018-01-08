@@ -44,7 +44,6 @@ async def create_new_user(apps, client, hangouts_user):
 
 async def add_users_to_room(apps, client, conv, room):
     for user in conv.users:
-        log.debug("Creating user %s", user)
         if not user.is_self:
             user = await create_new_user(apps, client, user)
 
