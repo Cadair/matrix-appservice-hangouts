@@ -6,7 +6,7 @@ import hangups
 from hangups import hangouts_pb2
 
 
-log = logging.getLogger("hangouts_as")
+log = logging.getLogger("hangouts_appservice")
 
 
 class HangoutsClient:
@@ -87,6 +87,7 @@ class HangoutsClient:
             (on_connect, task), return_when=asyncio.FIRST_COMPLETED
         )
         await asyncio.gather(*done)
+        self.client.on_disconnect.add_observer(self.on_disconnect)
         await asyncio.ensure_future(self.get_users_conversations())
         self.conversation_list.on_event.add_observer(self.on_event)
 
@@ -140,7 +141,6 @@ class HangoutsClient:
         image_id = await self.client.upload_image(image_data, filename=filename)
         return await conversation.send_message([], image_id=image_id)
 
-
     async def on_event(self, conv_event):
         """
         Recieve an event.
@@ -149,3 +149,6 @@ class HangoutsClient:
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
         await self.recieve_event_handler(self, conv, user, conv_event)
+
+    async def on_disconnect(self, event):
+        log.debug("Hangouts Client Disconnected")
