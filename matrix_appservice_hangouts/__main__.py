@@ -42,6 +42,16 @@ async def create_new_user(apps, client, hangouts_user):
     return user
 
 
+async def add_users_to_room(apps, client, conv, room):
+    for user in conv.users:
+        log.debug("Creating user %s", user)
+        if not user.is_self:
+            user = await create_new_user(apps, client, user)
+
+            if not user in room.users:
+                await apps.add_user_to_room(user.matrixid, room.matrixalias)
+
+
 async def create_new_room(apps, client, auth_user, service_roomid):
     conv = client.get_conversation(service_roomid)
     # Set the conversation name
@@ -56,13 +66,6 @@ async def create_new_room(apps, client, auth_user, service_roomid):
     room = await apps.create_linked_room(auth_user, service_roomid,
                                          matrix_roomname=convname)
 
-    for user in conv.users:
-        log.debug("Creating user %s", user)
-        if not user.is_self:
-            user = await create_new_user(apps, client, user)
-
-            if not user in room.users:
-                await apps.add_user_to_room(user.matrixid, room.matrixalias)
 
     return room
 
@@ -110,6 +113,10 @@ async def handle_hangouts_message(apps, client, conv, user, event):
     room = apps.get_room(serviceid=service_roomid)
     if not room:
         room = await create_new_room(apps, client, auth_user, service_roomid)
+
+    # Do this here to make sure new users are added after a restart or error
+    conv = client.get_conversation(service_roomid)
+    await add_users_to_room(apps, client, conv, room)
 
     try:
         if event.attachments:
