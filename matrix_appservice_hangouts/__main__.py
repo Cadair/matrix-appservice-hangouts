@@ -36,7 +36,8 @@ async def create_new_user(apps, client, hangouts_user):
         user = await apps.create_matrix_user(user_id,
                                              nick=hangouts_user.full_name)
 
-        await apps.set_matrix_profile_image(user.matrixid, "https:"+hangouts_user.photo_url)
+        if hangouts_user.photo_url:
+            await apps.set_matrix_profile_image(user.matrixid, "https:"+hangouts_user.photo_url)
 
     return user
 
