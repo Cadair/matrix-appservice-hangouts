@@ -128,6 +128,7 @@ async def handle_hangouts_message(apps, client, conv, user, event):
                                             message, self_id)
 
 
+
 @click.command()
 @click.option("--mxid", "-m", multiple=True)
 @click.option("--token", "-t", multiple=True)
@@ -181,6 +182,20 @@ def main(mxid, token, matrix_server, server_domain,
         return resp
 
 
+    async def reconnect(apps, serviceid, auth_token):
+        log.info("Reconnecting for user {}.".format(serviceid))
+        auth_user = apps.get_user(serviceid=serviceid)
+
+        future = asyncio.ensure_future(connect_hangouts(self, None, auth_token))
+        future.add_done_callback(partial(apps._connection_successful, user=auth_user))
+
+        if serviceid2 != serviceid:
+            auth_user.serviceid = serviceid2
+            apps.dbsession.commit()
+
+        apps.service_connections[auth_user] = future
+
+
     @apps.service_connect
     async def connect_hangouts(apps, userid, auth_token):
         # Each auth needs it's own session.
@@ -194,6 +209,8 @@ def main(mxid, token, matrix_server, server_domain,
         client.http_session = apps.http_session
         user = await client.get_self()
         serviceid = str(user.id_.gaia_id)
+
+        client.client.on_disconnect.add_observer(partial(reconnect, apps, serviceid, auth_token))
 
         return client, serviceid
 

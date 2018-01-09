@@ -87,7 +87,6 @@ class HangoutsClient:
             (on_connect, task), return_when=asyncio.FIRST_COMPLETED
         )
         await asyncio.gather(*done)
-        self.client.on_disconnect.add_observer(self.on_disconnect)
         await asyncio.ensure_future(self.get_users_conversations())
         self.conversation_list.on_event.add_observer(self.on_event)
 
@@ -149,6 +148,3 @@ class HangoutsClient:
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
         await self.recieve_event_handler(self, conv, user, conv_event)
-
-    async def on_disconnect(self, event):
-        log.debug("Hangouts Client Disconnected")
