@@ -92,9 +92,6 @@ async def handle_message_with_attachments(apps, event, service_userid, service_r
 
 
 async def handle_hangouts_message(apps, client, conv, user, event):
-    log.debug("Received message in hangouts room: %s from user %s",
-              conv.id_, user.id_.gaia_id)
-
     service_roomid = conv.id_
     service_userid = str(user.id_.gaia_id)
     message = event.text
