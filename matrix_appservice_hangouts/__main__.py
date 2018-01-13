@@ -91,9 +91,14 @@ async def handle_message_with_attachments(apps, event, service_userid, service_r
                                                 event.text, self_id)
 
 
-async def handle_hangouts_message(apps, client, conv, user, event):
+async def _handle_hangouts_message(apps, client, conv, user, event):
     service_roomid = conv.id_
     service_userid = str(user.id_.gaia_id)
+
+    # This is to catch a fail
+    if not hasattr(event, "text"):
+        log.error("Conversation event had no text")
+        return
     message = event.text
 
     self_id = await client.get_self()
@@ -102,6 +107,8 @@ async def handle_hangouts_message(apps, client, conv, user, event):
     # TODO: It would be nice if you didn't have to do this.
     if self_id == service_userid:
         return
+
+    log.debug("Got message: {} from: {}".format(message, service_userid))
 
     auth_user = apps.get_user(serviceid=self_id)
     assert isinstance(auth_user, db.AuthenticatedUser)
@@ -123,6 +130,16 @@ async def handle_hangouts_message(apps, client, conv, user, event):
 
     return await apps.relay_service_message(service_userid, service_roomid,
                                             message, self_id)
+
+
+async def handle_hangouts_message(apps, client, conv, user, event):
+    """
+    Guard the whole receive call because otherwise hangups kills the event loop.
+    """
+    try:
+        return await _handle_hangouts_message(apps, client, conv, user, event)
+    except Exception as e:
+        log.exception("An error occurred while processing the hangouts message.")
 
 
 

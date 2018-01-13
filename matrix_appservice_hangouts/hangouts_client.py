@@ -144,7 +144,6 @@ class HangoutsClient:
         """
         Recieve an event.
         """
-        log.debug(f"{conv_event}, {type(conv_event)}")
         conv = self.conversation_list.get(conv_event.conversation_id)
         user = conv.get_user(conv_event.user_id)
         await self.recieve_event_handler(self, conv, user, conv_event)
