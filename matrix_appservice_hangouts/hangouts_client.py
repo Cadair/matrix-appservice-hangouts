@@ -9,6 +9,15 @@ from hangups import hangouts_pb2
 log = logging.getLogger("hangouts_appservice")
 
 
+class HangoutsLoginError(Exception):
+    """ The home server returned an error response. """
+
+    def __init__(self, message, code=0, content=""):
+        super().__init__(f"{message} with code {code} {content}")
+        self.code = code
+        self.content = content
+
+
 class HangoutsClient:
     @staticmethod
     async def login(refresh_token, client_session):
@@ -22,6 +31,14 @@ class HangoutsClient:
                                           hangups.auth.OAUTH2_TOKEN_REQUEST_URL,
                                           headers={'user-agent': hangups.auth.USER_AGENT},
                                           data=token_request_data) as resp:
+            if not resp.status == 200:
+                try:
+                    json = await resp.json()
+                except Exception:
+                    json = ''
+
+                raise HangoutsLoginError("Hangouts login failed.", resp.status, json)
+
             json = await resp.json()
             access_token = json['access_token']
 
