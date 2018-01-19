@@ -40,7 +40,16 @@ this command connect to the localhost testing homeserver.
 
 You need to provide the matrix user id and hangouts authentication tokens for any users (technically only on first run, as they are then stored in the database). This may change in the future, but it is very hard to obtain hangouts tokens and there are security concerns over allowing people to login with the bridge. (Also I haven't implemented support for an admin chat channel yet!)
 
-The best way to get your personal login token is to `follow these instructions <https://github.com/tdryer/hangups/issues/350#issuecomment-323553771>`_. When logged in, you can find the refresh token in `~/.cache/hangups/refresh_token.txt` and use it to log in with the bridge.
+Example
+^^^^^^^
+
+.. code-block:: none
+
+  hangoutsas --matrix_server=http://localhost:8008 --server_domain=homeserver.org --access_token=xeehahR5eibXesEicohPh3Yisoi2osh5 --database-uri=sqlite:////opt/matrix-appservice-hangouts/hangouts.sqlite --mxid @bob:homeserver.org --token 1/7bVBdycv6hS2Su1F0jej2FTs9TJrNaCMkyX2_ARSnE4
+  
+where `mxid` is your matrix login which must receive messages from hangouts, `--token` is access_token of needed hangouts user (hangouts username is not needed, only access token). `mxid` and `token` pair can be set multiple times for add several hangouts bridges to different matrix users.
+
+The best way to get your personal hangouts login token is to `follow these instructions <https://github.com/tdryer/hangups/issues/350#issuecomment-323553771>`_. When logged in, you can find the refresh token in `~/.cache/hangups/refresh_token.txt` and use it to log in with the bridge.
 
 Installation
 ------------
