@@ -228,11 +228,13 @@ def main(mxid, token, matrix_server, server_domain,
 
         return client, serviceid
 
-
     for mxid, token in zip(mxid, token):
-        if not apps.get_user(matrixid=mxid):
+        user = apps.get_user(matrixid=mxid)
+        if not user:
             apps.add_authenticated_user(mxid, token)
-
+        else:
+            user.auth_token = token
+            apps.dbsession.commit()
 
     with apps.run() as run_forever:
         run_forever()
