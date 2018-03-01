@@ -110,7 +110,7 @@ async def _handle_hangouts_message(apps, client, conv, user, event):
 
     log.debug("Got message: {} from: {}".format(message, service_userid))
 
-    auth_user = apps.get_user(serviceid=self_id)
+    auth_user = apps.get_user(serviceid=self_id, user_type="auth")
     assert isinstance(auth_user, db.AuthenticatedUser)
 
     room = apps.get_room(serviceid=service_roomid)
